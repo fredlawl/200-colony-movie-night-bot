@@ -4,64 +4,87 @@ import (
 	"time"
 )
 
-type AppState int32
+type PeriodName int32
 
 const (
-	SUGGESTING AppState = iota
+	SUGGESTING PeriodName = iota
 	VOTING
 	MOVIENIGHT
 	SLEEP
 )
 
+// Configuration is based on a single 7 day week, with the seggestion
+// date starting on Monday.
 type AppConfig struct {
-	suggestionDayStart     time.Weekday
+	localization           string
 	suggestionPeriodInDays int
 	votePeriodInDays       int
 	movieNightPeriodInDays int
-	appState               AppState
-	timeLocation           time.Location
-	isoYear                int
-	isoWeek                int
-	daysLeftInCurrentState int
-	now                    time.Time
 }
 
-func CreateAppConfig() *AppConfig {
-	loc, _ := time.LoadLocation("America/Chicago")
-	cfg := AppConfig{
-		suggestionDayStart:     time.Monday,
+type Period struct {
+	name     PeriodName
+	daysLeft int
+}
+
+type AppSettings struct {
+	curPeriod    Period
+	localization time.Location
+	isoYear      int
+	isoWeek      int
+	curDay       time.Time // This is the current day with no time.
+}
+
+func DefaultConfiguration() AppConfig {
+	return AppConfig{
+		localization:           "America/Chicago",
 		suggestionPeriodInDays: 3,
 		votePeriodInDays:       1,
 		movieNightPeriodInDays: 1,
-		appState:               SLEEP,
-		timeLocation:           *loc,
 	}
-
-	now := time.Now().In(loc)
-	cfg.now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	cfg.appState, cfg.daysLeftInCurrentState = calculateState(cfg, cfg.now)
-	cfg.isoYear, cfg.isoWeek = now.ISOWeek()
-
-	return &cfg
 }
 
-func calculateState(cfg AppConfig, now time.Time) (curState AppState, daysLeft int) {
+func CreateAppSettings(cfg AppConfig) AppSettings {
+	loc, _ := time.LoadLocation(cfg.localization)
+
+	settings := AppSettings{
+		localization: *loc,
+	}
+
+	now := time.Now().In(&settings.localization)
+	settings.curDay = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0,
+		0, &settings.localization)
+	settings.isoYear, settings.isoWeek = now.ISOWeek()
+	settings.curPeriod = calculatePeriod(cfg, settings.curDay)
+
+	return settings
+}
+
+func calculatePeriod(cfg AppConfig, now time.Time) Period {
+	curPeriod := Period{
+		name:     SLEEP,
+		daysLeft: 0,
+	}
+
 	suggestionPeriodStart := now.AddDate(0, 0, -int(now.Weekday()))
 	suggestionPeriodEnd := suggestionPeriodStart.AddDate(0, 0, cfg.suggestionPeriodInDays)
 	votingPeriodEnd := suggestionPeriodEnd.AddDate(0, 0, cfg.votePeriodInDays)
 	movieNightPeriodEnd := votingPeriodEnd.AddDate(0, 0, cfg.movieNightPeriodInDays)
 
 	if now.After(suggestionPeriodStart) && now.Before(suggestionPeriodEnd.AddDate(0, 0, 1)) {
-		return SUGGESTING, int(suggestionPeriodEnd.Sub(now).Hours()) / 24
+		curPeriod.name = SUGGESTING
+		curPeriod.daysLeft = int(suggestionPeriodEnd.Sub(now).Hours()) / 24
 	}
 
 	if now.After(suggestionPeriodEnd) && now.Before(votingPeriodEnd.AddDate(0, 0, 1)) {
-		return VOTING, int(votingPeriodEnd.Sub(now).Hours()) / 24
+		curPeriod.name = VOTING
+		curPeriod.daysLeft = int(votingPeriodEnd.Sub(now).Hours()) / 24
 	}
 
 	if now.After(votingPeriodEnd) && now.Before(movieNightPeriodEnd.AddDate(0, 0, 1)) {
-		return MOVIENIGHT, int(movieNightPeriodEnd.Sub(now).Hours()) / 24
+		curPeriod.name = MOVIENIGHT
+		curPeriod.daysLeft = int(movieNightPeriodEnd.Sub(now).Hours()) / 24
 	}
 
-	return SLEEP, 0
+	return curPeriod
 }

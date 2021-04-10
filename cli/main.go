@@ -10,17 +10,15 @@ import (
 // TODO: Use github.com/urfave/cli for cli configuration
 
 func main() {
-	log.Println("before create")
-	cfg := CreateAppConfig()
-	log.Println("after create")
+	cfg := DefaultConfiguration()
+	settings := CreateAppSettings(cfg)
 
 	db, err := bolt.Open("cli.db", 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("test")
-	log.Println(cfg.appState)
+	log.Println(settings.curPeriod.name)
 
 	defer db.Close()
 }
