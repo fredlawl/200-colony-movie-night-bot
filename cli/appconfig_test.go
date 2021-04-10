@@ -7,7 +7,7 @@ import (
 
 func TestGivenASuggestionPeriodDateStateIsInSuggesting(t *testing.T) {
 	cfg := DefaultConfiguration()
-	settings := CreateAppSettings(cfg)
+	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 5, 0, 0, 0, 0, &settings.localization)
 
 	expected := SUGGESTING
@@ -20,7 +20,7 @@ func TestGivenASuggestionPeriodDateStateIsInSuggesting(t *testing.T) {
 
 func TestGivenAEndSuggestionPeriodDateStateIsInSuggesting(t *testing.T) {
 	cfg := DefaultConfiguration()
-	settings := CreateAppSettings(cfg)
+	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 7, 0, 0, 0, 0, &settings.localization)
 
 	expected := SUGGESTING
@@ -33,7 +33,7 @@ func TestGivenAEndSuggestionPeriodDateStateIsInSuggesting(t *testing.T) {
 
 func TestGivenAVotingDateStateIsInVoting(t *testing.T) {
 	cfg := DefaultConfiguration()
-	settings := CreateAppSettings(cfg)
+	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 8, 0, 0, 0, 0, &settings.localization)
 
 	expected := VOTING
@@ -46,7 +46,7 @@ func TestGivenAVotingDateStateIsInVoting(t *testing.T) {
 
 func TestGivenAMovieNightDateStateIsInMovienight(t *testing.T) {
 	cfg := DefaultConfiguration()
-	settings := CreateAppSettings(cfg)
+	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 9, 0, 0, 0, 0, &settings.localization)
 
 	expected := MOVIENIGHT
@@ -59,7 +59,7 @@ func TestGivenAMovieNightDateStateIsInMovienight(t *testing.T) {
 
 func TestGivenASleepDateStateIsInSleep(t *testing.T) {
 	cfg := DefaultConfiguration()
-	settings := CreateAppSettings(cfg)
+	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 10, 0, 0, 0, 0, &settings.localization)
 
 	expected := SLEEP

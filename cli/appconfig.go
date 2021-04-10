@@ -44,8 +44,12 @@ func DefaultConfiguration() AppConfig {
 	}
 }
 
-func CreateAppSettings(cfg AppConfig) AppSettings {
-	loc, _ := time.LoadLocation(cfg.localization)
+func CreateAppSettings(cfg AppConfig) (*AppSettings, error) {
+	loc, locErr := time.LoadLocation(cfg.localization)
+
+	if locErr != nil {
+		return nil, locErr
+	}
 
 	settings := AppSettings{
 		localization: *loc,
@@ -57,7 +61,7 @@ func CreateAppSettings(cfg AppConfig) AppSettings {
 	settings.isoYear, settings.isoWeek = now.ISOWeek()
 	settings.curPeriod = calculatePeriod(cfg, settings.curDay)
 
-	return settings
+	return &settings, nil
 }
 
 func calculatePeriod(cfg AppConfig, now time.Time) Period {

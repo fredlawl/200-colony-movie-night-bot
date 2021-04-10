@@ -13,12 +13,17 @@ import (
 
 func main() {
 	cfg := DefaultConfiguration()
-	settings := CreateAppSettings(cfg)
+	settings, settingsErr := CreateAppSettings(cfg)
+
+	if settingsErr != nil {
+		log.Fatal(settingsErr)
+	}
+
 	_ = settings
 
-	db, err := bolt.Open("cli.db", 0600, nil)
-	if err != nil {
-		log.Fatal(err)
+	db, dbErr := bolt.Open("cli.db", 0600, nil)
+	if dbErr != nil {
+		log.Fatal(dbErr)
 	}
 
 	app := &cli.App{
@@ -45,7 +50,7 @@ func main() {
 
 	cliErr := app.Run(os.Args)
 	if cliErr != nil {
-		log.Fatal(err)
+		log.Fatal(cliErr)
 	}
 
 	defer db.Close()
