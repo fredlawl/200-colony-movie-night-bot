@@ -1,30 +1,32 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
-	"github.com/boltdb/bolt"
+	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 )
 
-// TODO: Use https://github.com/boltdb/bolt for embeded DB
-// TODO: Use github.com/urfave/cli for cli configuration
-
 func main() {
-	cfg := DefaultConfiguration()
-	settings, settingsErr := CreateAppSettings(cfg)
+	appId := uuid.New().String()
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Format(time.RFC3339)
+	errorLogName := fmt.Sprintf("logs/%s.error.log", today)
 
-	if settingsErr != nil {
-		log.Fatal(settingsErr)
+	os.Mkdir("logs", 0700)
+
+	errorLogFile, errorLogFileErr := os.OpenFile(errorLogName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+
+	if errorLogFileErr != nil {
+		log.Fatalf("[error] %s error creating logfile %v", appId, errorLogFileErr)
 	}
+	defer errorLogFile.Close()
 
-	_ = settings
-
-	db, dbErr := bolt.Open("cli.db", 0600, nil)
-	if dbErr != nil {
-		log.Fatal(dbErr)
-	}
+	log.SetOutput(errorLogFile)
 
 	app := &cli.App{
 		Name:     "mov",
@@ -50,8 +52,9 @@ func main() {
 
 	cliErr := app.Run(os.Args)
 	if cliErr != nil {
-		log.Fatal(cliErr)
+		log.Printf("[error] %s %s",
+			appId,
+			strings.Join(os.Args, " "))
+		log.Fatalf("[error] %s %v", appId, cliErr)
 	}
-
-	defer db.Close()
 }
