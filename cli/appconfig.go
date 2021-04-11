@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type Period struct {
 }
 
 type AppSettings struct {
+	config       AppConfig
 	curPeriod    Period
 	localization time.Location
 	isoYear      int
@@ -52,16 +54,28 @@ func CreateAppSettings(cfg AppConfig) (*AppSettings, error) {
 	}
 
 	settings := AppSettings{
+		config:       cfg,
 		localization: *loc,
 	}
 
-	now := time.Now().In(&settings.localization)
+	settings.setTime(time.Now())
+
+	return &settings, nil
+}
+
+// Reconfigure settings to a new time. This is especially useful for testing
+// purposes.
+func (settings *AppSettings) setTime(now time.Time) {
+	now = now.In(&settings.localization)
 	settings.curDay = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0,
 		0, &settings.localization)
 	settings.isoYear, settings.isoWeek = now.ISOWeek()
-	settings.curPeriod = calculatePeriod(cfg, settings.curDay)
+	settings.curPeriod = calculatePeriod(settings.config, settings.curDay)
+}
 
-	return &settings, nil
+// Generates a week ID basied on current settings.
+func (settings AppSettings) WeekId() string {
+	return fmt.Sprintf("%d%02d", settings.isoYear, settings.isoWeek)
 }
 
 func calculatePeriod(cfg AppConfig, now time.Time) Period {
