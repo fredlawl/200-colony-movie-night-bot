@@ -2,6 +2,11 @@ FROM golang:1.16.3-alpine3.13
 
 ENV CGO_ENABLED=0
 
+COPY . .
+
 RUN go get -v golang.org/x/tools/gopls
 RUN go get -v github.com/go-delve/delve/cmd/dlv
 RUN go get -v github.com/ramya-rao-a/go-outline
+
+RUN cd cli && go mod tidy
+RUN cd bot && go mod tidy
