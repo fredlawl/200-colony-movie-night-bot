@@ -9,5 +9,30 @@
         {
             "path": "bot"
         }
-    ]
+    ],
+    "launch": {
+        "configurations": [
+            {
+                "name": "CLI Debug Test",
+                "type": "go",
+                "request": "launch",
+                "mode": "test",
+                "program": "${fileDirname}",
+                "env": {},
+                "args": [],
+                "showLog": true
+            },
+            {
+                "name": "CLI Debug Test File",
+                "type": "go",
+                "request": "launch",
+                "mode": "test",
+                "program": "${file}",
+                "env": {},
+                "args": [],
+                "showLog": true
+            }
+        ],
+        "compounds": []
+    }
 }
