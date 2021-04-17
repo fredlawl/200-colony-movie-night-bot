@@ -69,25 +69,3 @@ func TestGivenASleepDateStateIsInSleep(t *testing.T) {
 		t.Fail()
 	}
 }
-
-func TestGiveDateWhenExecutedWeekIdGivesFormattedId(t *testing.T) {
-	cfg := DefaultConfiguration()
-	settings, _ := CreateAppSettings(cfg)
-	settings.setTime(time.Date(2021, 4, 10, 0, 0, 0, 0, &settings.localization))
-	actual := settings.WeekId()
-
-	if actual != "202114" {
-		t.Fail()
-	}
-}
-
-func TestGiveDateWithASingleDigitWeekWhenExecutedWeekIdGivesFormattedId(t *testing.T) {
-	cfg := DefaultConfiguration()
-	settings, _ := CreateAppSettings(cfg)
-	settings.setTime(time.Date(2021, 1, 10, 0, 0, 0, 0, &settings.localization))
-	actual := settings.WeekId()
-
-	if actual != "202101" {
-		t.Fail()
-	}
-}
