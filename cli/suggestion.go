@@ -173,6 +173,40 @@ func suggestMovieAction(c *cli.Context) error {
 	return nil
 }
 
+func listMoviesAction(c *cli.Context) error {
+	cfg := DefaultConfiguration()
+	settings, settingsErr := CreateAppSettings(cfg)
+
+	if settingsErr != nil {
+		return settingsErr
+	}
+
+	db, err := openDb(settings.weekId)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return db.View(func(tx *bolt.Tx) error {
+		weekBucket := tx.Bucket([]byte(settings.weekId.String()))
+		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+
+		suggestionsCursor := suggestionsBucket.Cursor()
+
+		for k, v := suggestionsCursor.First(); k != nil; k, v = suggestionsCursor.Next() {
+			var suggestion Suggestion
+			unmarshalErr := json.Unmarshal(v, &suggestion)
+			if unmarshalErr != nil {
+				return unmarshalErr
+			}
+
+			fmt.Printf("key=%s, value=%s\n", k, v)
+		}
+
+		return nil
+	})
+}
+
 func SuggestionCliCommand() *cli.Command {
 	description := `List this weeks suggestions:
     mov suggestions list
@@ -191,6 +225,7 @@ Add suggestion:
 				Name:    "list",
 				Aliases: []string{"l"},
 				Usage:   "Lists suggested movies",
+				Action:  listMoviesAction,
 			},
 			{
 				Name:    "suggest",
