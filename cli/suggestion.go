@@ -11,8 +11,8 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var SUGGESTION_BUCKET_NAME string = "suggestions"
-var SUGGESTION_BUCKET_LOOKUP_NAME string = "lookup"
+const SUGGESTION_BUCKET_NAME string = "suggestions"
+const SUGGESTION_BUCKET_LOOKUP_NAME string = "lookup"
 
 type SuggestionId string
 
@@ -101,6 +101,39 @@ func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
 	return nil
 }
 
+func openDb(week WeekId) (*bolt.DB, error) {
+	db, err := bolt.Open("cli.db", 0600, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	dbErr := db.Update(func(tx *bolt.Tx) error {
+		weekBucket, err := tx.CreateBucketIfNotExists([]byte(week.String()))
+		if err != nil {
+			return err
+		}
+
+		_, serr := weekBucket.CreateBucketIfNotExists([]byte(SUGGESTION_BUCKET_NAME))
+		if serr != nil {
+			return serr
+		}
+
+		_, lerr := weekBucket.CreateBucketIfNotExists([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
+		if lerr != nil {
+			return lerr
+		}
+
+		return nil
+	})
+
+	if dbErr != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
+}
+
 func suggestMovieAction(c *cli.Context) error {
 	cfg := DefaultConfiguration()
 	settings, settingsErr := CreateAppSettings(cfg)
@@ -109,7 +142,7 @@ func suggestMovieAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := bolt.Open("cli.db", 0600, nil)
+	db, err := openDb(settings.weekId)
 	if err != nil {
 		return err
 	}
