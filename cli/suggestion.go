@@ -50,20 +50,9 @@ func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
 	}
 	defer tx.Rollback()
 
-	weekBucket, err := tx.CreateBucketIfNotExists([]byte(suggestion.WeekId.String()))
-	if err != nil {
-		return err
-	}
-
-	suggestionBucket, err := weekBucket.CreateBucketIfNotExists([]byte(SUGGESTION_BUCKET_NAME))
-	if err != nil {
-		return err
-	}
-
-	lookupBucket, err := weekBucket.CreateBucketIfNotExists([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
-	if err != nil {
-		return err
-	}
+	weekBucket := tx.Bucket([]byte(suggestion.WeekId.String()))
+	suggestionBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+	lookupBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
 
 	// TODO: Check if movie currently exists prior to save, this will work
 	//   based off the suggestion order or movie encoding
