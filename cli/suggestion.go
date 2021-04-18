@@ -43,54 +43,12 @@ func NewSuggestion(weekId WeekId, author string, movie Movie) (*Suggestion, erro
 	}, nil
 }
 
-func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
-	tx, err := db.Begin(true)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	weekBucket := tx.Bucket([]byte(suggestion.WeekId.String()))
-	suggestionBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
-	lookupBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
-
-	// TODO: Check if movie currently exists prior to save, this will work
-	//   based off the suggestion order or movie encoding
-
-	orderId, err := suggestionBucket.NextSequence()
-	if err != nil {
-		return err
-	}
-	suggestion.Order = orderId
-
-	if buf, err := json.Marshal(suggestion); err != nil {
-		return err
-	} else if err := suggestionBucket.Put([]byte(suggestion.Id.String()), buf); err != nil {
-		return err
-	}
-
-	// Following two insertions creates two lookups per suggestion
-	//  1. Order
-	//  2. Movie encoding
-	// This allows people to either type the movie name, hash, or order to make a vote
-	orderLookupKey := fmt.Sprintf("%s:%s", "order", strconv.FormatUint(orderId, 10))
-	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(suggestion.Id.String())); err != nil {
-		return err
-	}
-
-	movieHashLookupKey := fmt.Sprintf("%s:%s", "hash", suggestion.Movie.Encode())
-	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(suggestion.Id.String())); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	return nil
+type SuggestionPersistanceContext struct {
+	db     *bolt.DB
+	weekId WeekId
 }
 
-func openDb(week WeekId) (*bolt.DB, error) {
+func NewSuggestionPersistance(week WeekId) (*SuggestionPersistanceContext, error) {
 	db, err := bolt.Open("cli.db", 0600, nil)
 	if err != nil {
 		return nil, err
@@ -120,7 +78,70 @@ func openDb(week WeekId) (*bolt.DB, error) {
 		return nil, err
 	}
 
-	return db, nil
+	return &SuggestionPersistanceContext{
+		db:     db,
+		weekId: week,
+	}, nil
+}
+
+func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
+	tx, err := context.db.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	weekBucket := tx.Bucket([]byte(s.WeekId.String()))
+	suggestionBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+	lookupBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
+
+	// TODO: Check if movie currently exists prior to save, this will work
+	//   based off the suggestion order or movie encoding
+
+	orderId, err := suggestionBucket.NextSequence()
+	if err != nil {
+		return err
+	}
+	s.Order = orderId
+
+	if buf, err := json.Marshal(s); err != nil {
+		return err
+	} else if err := suggestionBucket.Put([]byte(s.Id.String()), buf); err != nil {
+		return err
+	}
+
+	// Following two insertions creates two lookups per suggestion
+	//  1. Order
+	//  2. Movie encoding
+	// This allows people to either type the movie name, hash, or order to make a vote
+	orderLookupKey := fmt.Sprintf("%s:%s", "order", strconv.FormatUint(orderId, 10))
+	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(s.Id.String())); err != nil {
+		return err
+	}
+
+	movieHashLookupKey := fmt.Sprintf("%s:%s", "hash", s.Movie.Encode())
+	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(s.Id.String())); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (context *SuggestionPersistanceContext) AllSuggestions(callback func(cursor *bolt.Cursor) error) error {
+	return context.db.View(func(tx *bolt.Tx) error {
+		weekBucket := tx.Bucket([]byte(context.weekId.String()))
+		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+		suggestionsCursor := suggestionsBucket.Cursor()
+		return callback(suggestionsCursor)
+	})
+}
+
+func (context *SuggestionPersistanceContext) Close() {
+	context.db.Close()
 }
 
 func suggestMovieAction(c *cli.Context) error {
@@ -131,7 +152,7 @@ func suggestMovieAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := openDb(settings.weekId)
+	db, err := NewSuggestionPersistance(settings.weekId)
 	if err != nil {
 		return err
 	}
@@ -153,7 +174,7 @@ func suggestMovieAction(c *cli.Context) error {
 		return err
 	}
 
-	saveErr := suggestion.SaveSuggestion(db)
+	saveErr := db.Save(*suggestion)
 	if saveErr != nil {
 		c.App.Writer.Write([]byte("Unable to save this movie.\n"))
 		return saveErr
@@ -170,19 +191,14 @@ func listMoviesAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := openDb(settings.weekId)
+	db, err := NewSuggestionPersistance(settings.weekId)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	return db.View(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(settings.weekId.String()))
-		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
-
-		suggestionsCursor := suggestionsBucket.Cursor()
-
-		for k, v := suggestionsCursor.First(); k != nil; k, v = suggestionsCursor.Next() {
+	return db.AllSuggestions(func(cursor *bolt.Cursor) error {
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
 			var suggestion Suggestion
 			unmarshalErr := json.Unmarshal(v, &suggestion)
 			if unmarshalErr != nil {
