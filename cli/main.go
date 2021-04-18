@@ -44,6 +44,15 @@ func main() {
 				Hidden:   true,
 				Required: true,
 			},
+			// To help with testing, allow app to bypass Period restrictions
+			&cli.BoolFlag{
+				Name:     "bypass",
+				Aliases:  []string{"bp"},
+				Usage:    "disable app state check",
+				Hidden:   true,
+				Required: false,
+				Value:    false,
+			},
 		},
 		Commands: []*cli.Command{
 			SuggestionCliCommand(),

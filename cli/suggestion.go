@@ -120,7 +120,7 @@ func suggestMovieAction(c *cli.Context) error {
 		return writeErr
 	}
 
-	if settings.curPeriod.name != SUGGESTING {
+	if settings.curPeriod.name != SUGGESTING && !c.Bool("bypass") {
 		_, writeErr := c.App.Writer.Write([]byte("Sorry, unable to add the movie to suggestions. The suggestion period has already ended.\n"))
 		return writeErr
 	}
