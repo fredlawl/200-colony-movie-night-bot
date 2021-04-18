@@ -25,6 +25,7 @@ type Suggestion struct {
 	weekId WeekId
 	author string
 	movie  Movie
+	order  uint64
 }
 
 func NewSuggestion(weekId WeekId, author string, movie Movie) (*Suggestion, error) {
@@ -38,6 +39,7 @@ func NewSuggestion(weekId WeekId, author string, movie Movie) (*Suggestion, erro
 		weekId: weekId,
 		author: author,
 		movie:  movie,
+		order:  1,
 	}, nil
 }
 
@@ -70,6 +72,7 @@ func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
 	if err != nil {
 		return err
 	}
+	suggestion.order = orderId
 
 	if buf, err := json.Marshal(suggestion); err != nil {
 		return err
@@ -81,12 +84,12 @@ func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
 	//  1. Order
 	//  2. Movie encoding
 	// This allows people to either type the movie name, hash, or order to make a vote
-	orderLookupKey := fmt.Sprintf("%s:%s", "lookup", strconv.FormatUint(orderId, 10))
+	orderLookupKey := fmt.Sprintf("%s:%s", "order", strconv.FormatUint(orderId, 10))
 	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(suggestion.id.String())); err != nil {
 		return err
 	}
 
-	movieHashLookupKey := fmt.Sprintf("%s:%s", "lookup", suggestion.movie.Encode())
+	movieHashLookupKey := fmt.Sprintf("%s:%s", "hash", suggestion.movie.Encode())
 	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(suggestion.id.String())); err != nil {
 		return err
 	}
