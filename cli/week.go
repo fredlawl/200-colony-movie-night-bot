@@ -6,18 +6,18 @@ import (
 )
 
 type WeekId struct {
-	isoYear int
-	isoWeek int
+	IsoYear int
+	IsoWeek int
 }
 
 func (w WeekId) String() string {
-	return fmt.Sprintf("%d%02d", w.isoYear, w.isoWeek)
+	return fmt.Sprintf("%d%02d", w.IsoYear, w.IsoWeek)
 }
 
 func WeekIdFromTime(t time.Time) WeekId {
 	isoYear, isoWeek := t.ISOWeek()
 	return WeekId{
-		isoYear: isoYear,
-		isoWeek: isoWeek,
+		IsoYear: isoYear,
+		IsoWeek: isoWeek,
 	}
 }

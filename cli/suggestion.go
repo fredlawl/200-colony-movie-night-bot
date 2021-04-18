@@ -21,11 +21,11 @@ func (SuggestionId SuggestionId) String() string {
 }
 
 type Suggestion struct {
-	id     SuggestionId
-	weekId WeekId
-	author string
-	movie  Movie
-	order  uint64
+	Id     SuggestionId
+	WeekId WeekId
+	Author string
+	Movie  Movie
+	Order  uint64
 }
 
 func NewSuggestion(weekId WeekId, author string, movie Movie) (*Suggestion, error) {
@@ -35,11 +35,11 @@ func NewSuggestion(weekId WeekId, author string, movie Movie) (*Suggestion, erro
 
 	suggestionId := SuggestionId(uuid.New().String())
 	return &Suggestion{
-		id:     suggestionId,
-		weekId: weekId,
-		author: author,
-		movie:  movie,
-		order:  1,
+		Id:     suggestionId,
+		WeekId: weekId,
+		Author: author,
+		Movie:  movie,
+		Order:  1,
 	}, nil
 }
 
@@ -50,7 +50,7 @@ func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
 	}
 	defer tx.Rollback()
 
-	weekBucket, err := tx.CreateBucketIfNotExists([]byte(suggestion.weekId.String()))
+	weekBucket, err := tx.CreateBucketIfNotExists([]byte(suggestion.WeekId.String()))
 	if err != nil {
 		return err
 	}
@@ -72,11 +72,11 @@ func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
 	if err != nil {
 		return err
 	}
-	suggestion.order = orderId
+	suggestion.Order = orderId
 
 	if buf, err := json.Marshal(suggestion); err != nil {
 		return err
-	} else if err := suggestionBucket.Put([]byte(suggestion.id.String()), buf); err != nil {
+	} else if err := suggestionBucket.Put([]byte(suggestion.Id.String()), buf); err != nil {
 		return err
 	}
 
@@ -85,12 +85,12 @@ func (suggestion *Suggestion) SaveSuggestion(db *bolt.DB) error {
 	//  2. Movie encoding
 	// This allows people to either type the movie name, hash, or order to make a vote
 	orderLookupKey := fmt.Sprintf("%s:%s", "order", strconv.FormatUint(orderId, 10))
-	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(suggestion.id.String())); err != nil {
+	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(suggestion.Id.String())); err != nil {
 		return err
 	}
 
-	movieHashLookupKey := fmt.Sprintf("%s:%s", "hash", suggestion.movie.Encode())
-	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(suggestion.id.String())); err != nil {
+	movieHashLookupKey := fmt.Sprintf("%s:%s", "hash", suggestion.Movie.Encode())
+	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(suggestion.Id.String())); err != nil {
 		return err
 	}
 
