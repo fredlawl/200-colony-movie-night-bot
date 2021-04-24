@@ -131,12 +131,26 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 	return nil
 }
 
-func (context *SuggestionPersistanceContext) AllSuggestions(callback func(cursor *bolt.Cursor) error) error {
+func (context *SuggestionPersistanceContext) AllSuggestions(callback func(key []byte, suggestion *Suggestion) error) error {
 	return context.db.View(func(tx *bolt.Tx) error {
 		weekBucket := tx.Bucket([]byte(context.weekId.String()))
 		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
-		suggestionsCursor := suggestionsBucket.Cursor()
-		return callback(suggestionsCursor)
+		cursor := suggestionsBucket.Cursor()
+
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			var suggestion Suggestion
+			unmarshalErr := json.Unmarshal(v, &suggestion)
+			if unmarshalErr != nil {
+				return unmarshalErr
+			}
+
+			err := callback(k, &suggestion)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 
@@ -197,17 +211,8 @@ func listMoviesAction(c *cli.Context) error {
 	}
 	defer db.Close()
 
-	return db.AllSuggestions(func(cursor *bolt.Cursor) error {
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			var suggestion Suggestion
-			unmarshalErr := json.Unmarshal(v, &suggestion)
-			if unmarshalErr != nil {
-				return unmarshalErr
-			}
-
-			fmt.Printf("key=%s, value=%s\n", k, v)
-		}
-
+	return db.AllSuggestions(func(k []byte, s *Suggestion) error {
+		fmt.Printf("key=%s, value=%s\n", k, s.Movie)
 		return nil
 	})
 }
