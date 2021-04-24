@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/boltdb/bolt"
 	"github.com/google/uuid"
@@ -211,10 +212,24 @@ func listMoviesAction(c *cli.Context) error {
 	}
 	defer db.Close()
 
-	return db.AllSuggestions(func(k []byte, s *Suggestion) error {
-		fmt.Printf("key=%s, value=%s\n", k, s.Movie)
+	var outputBuffer strings.Builder
+
+	outputBuffer.WriteString(fmt.Sprintf("%-4s%-.32s\n", "ID", "Movie"))
+
+	listerr := db.AllSuggestions(func(k []byte, s *Suggestion) error {
+		outputBuffer.WriteString(fmt.Sprintf("%-4d%-.32s\n",
+			s.Order,
+			s.Movie.String()))
 		return nil
 	})
+
+	if listerr != nil {
+		return listerr
+	}
+
+	c.App.Writer.Write([]byte(outputBuffer.String()))
+
+	return nil
 }
 
 func SuggestionCliCommand() *cli.Command {
