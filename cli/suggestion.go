@@ -12,32 +12,32 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-const SUGGESTION_BUCKET_NAME string = "suggestions"
-const SUGGESTION_BUCKET_LOOKUP_NAME string = "lookup"
+const SuggestionBucketName string = "suggestions"
+const SuggestedBucketLookupName string = "lookup"
 
-type SuggestionId string
+type SuggestionID string
 
-func (SuggestionId SuggestionId) String() string {
+func (SuggestionId SuggestionID) String() string {
 	return string(SuggestionId)
 }
 
 type Suggestion struct {
-	Id     SuggestionId
-	WeekId WeekId
+	ID     SuggestionID
+	WeekID WeekID
 	Author string
 	Movie  Movie
 	Order  uint64
 }
 
-func NewSuggestion(weekId WeekId, author string, movie Movie) (*Suggestion, error) {
+func NewSuggestion(weekID WeekID, author string, movie Movie) (*Suggestion, error) {
 	if len(movie.Encode()) == 0 {
 		return nil, errors.New("movie could not be encoded")
 	}
 
-	suggestionId := SuggestionId(uuid.New().String())
+	suggestionID := SuggestionID(uuid.New().String())
 	return &Suggestion{
-		Id:     suggestionId,
-		WeekId: weekId,
+		ID:     suggestionID,
+		WeekID: weekID,
 		Author: author,
 		Movie:  movie,
 		Order:  1,
@@ -46,10 +46,10 @@ func NewSuggestion(weekId WeekId, author string, movie Movie) (*Suggestion, erro
 
 type SuggestionPersistanceContext struct {
 	db     *bolt.DB
-	weekId WeekId
+	weekID WeekID
 }
 
-func NewSuggestionPersistance(week WeekId) (*SuggestionPersistanceContext, error) {
+func NewSuggestionPersistance(week WeekID) (*SuggestionPersistanceContext, error) {
 	db, err := bolt.Open("cli.db", 0600, nil)
 	if err != nil {
 		return nil, err
@@ -61,12 +61,12 @@ func NewSuggestionPersistance(week WeekId) (*SuggestionPersistanceContext, error
 			return err
 		}
 
-		_, serr := weekBucket.CreateBucketIfNotExists([]byte(SUGGESTION_BUCKET_NAME))
+		_, serr := weekBucket.CreateBucketIfNotExists([]byte(SuggestionBucketName))
 		if serr != nil {
 			return serr
 		}
 
-		_, lerr := weekBucket.CreateBucketIfNotExists([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
+		_, lerr := weekBucket.CreateBucketIfNotExists([]byte(SuggestedBucketLookupName))
 		if lerr != nil {
 			return lerr
 		}
@@ -81,7 +81,7 @@ func NewSuggestionPersistance(week WeekId) (*SuggestionPersistanceContext, error
 
 	return &SuggestionPersistanceContext{
 		db:     db,
-		weekId: week,
+		weekID: week,
 	}, nil
 }
 
@@ -92,22 +92,22 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 	}
 	defer tx.Rollback()
 
-	weekBucket := tx.Bucket([]byte(s.WeekId.String()))
-	suggestionBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
-	lookupBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
+	weekBucket := tx.Bucket([]byte(s.WeekID.String()))
+	suggestionBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
+	lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
 
 	// TODO: Check if movie currently exists prior to save, this will work
 	//   based off the suggestion order or movie encoding
 
-	orderId, err := suggestionBucket.NextSequence()
+	orderID, err := suggestionBucket.NextSequence()
 	if err != nil {
 		return err
 	}
-	s.Order = orderId
+	s.Order = orderID
 
 	if buf, err := json.Marshal(s); err != nil {
 		return err
-	} else if err := suggestionBucket.Put([]byte(s.Id.String()), buf); err != nil {
+	} else if err := suggestionBucket.Put([]byte(s.ID.String()), buf); err != nil {
 		return err
 	}
 
@@ -115,13 +115,13 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 	//  1. Order
 	//  2. Movie encoding
 	// This allows people to either type the movie name, hash, or order to make a vote
-	orderLookupKey := context.OrderLookupKey(orderId)
-	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(s.Id.String())); err != nil {
+	orderLookupKey := context.OrderLookupKey(orderID)
+	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(s.ID.String())); err != nil {
 		return err
 	}
 
 	movieHashLookupKey := context.MovieHashLookupKey(s.Movie)
-	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(s.Id.String())); err != nil {
+	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(s.ID.String())); err != nil {
 		return err
 	}
 
@@ -134,8 +134,8 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 
 func (context *SuggestionPersistanceContext) AllSuggestions(callback func(key []byte, suggestion *Suggestion) error) error {
 	return context.db.View(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(context.weekId.String()))
-		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+		weekBucket := tx.Bucket([]byte(context.weekID.String()))
+		suggestionsBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
 		cursor := suggestionsBucket.Cursor()
 
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
@@ -170,9 +170,9 @@ func (context *SuggestionPersistanceContext) GetSuggestionByOrder(orderID uint64
 	var suggestion Suggestion
 
 	err := context.db.View(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(context.weekId.String()))
-		lookupBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
-		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+		weekBucket := tx.Bucket([]byte(context.weekID.String()))
+		lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
+		suggestionsBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
 
 		key := lookupBucket.Get([]byte(context.OrderLookupKey(orderID)))
 		value := suggestionsBucket.Get([]byte(key))
@@ -190,16 +190,16 @@ func (context *SuggestionPersistanceContext) GetSuggestionByOrder(orderID uint64
 
 func (context *SuggestionPersistanceContext) Remove(s *Suggestion) error {
 	return context.db.Update(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(context.weekId.String()))
-		lookupBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
-		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+		weekBucket := tx.Bucket([]byte(context.weekID.String()))
+		lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
+		suggestionsBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
 
-		orderIdKey := context.OrderLookupKey(s.Order)
+		orderIDKey := context.OrderLookupKey(s.Order)
 		hashKey := context.MovieHashLookupKey(s.Movie)
 
-		lookupBucket.Delete([]byte(orderIdKey))
+		lookupBucket.Delete([]byte(orderIDKey))
 		lookupBucket.Delete([]byte(hashKey))
-		suggestionsBucket.Delete([]byte(s.Id.String()))
+		suggestionsBucket.Delete([]byte(s.ID.String()))
 
 		return nil
 	})
@@ -218,7 +218,7 @@ func suggestMovieAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := NewSuggestionPersistance(settings.weekId)
+	db, err := NewSuggestionPersistance(settings.weekID)
 	if err != nil {
 		return err
 	}
@@ -229,12 +229,12 @@ func suggestMovieAction(c *cli.Context) error {
 		return writeErr
 	}
 
-	if settings.curPeriod.name != SUGGESTING && !c.Bool("bypass") {
+	if settings.curPeriod.name != Suggesting && !c.Bool("bypass") {
 		_, writeErr := c.App.Writer.Write([]byte("Sorry, unable to add the movie to suggestions. The suggestion period has already ended.\n"))
 		return writeErr
 	}
 
-	suggestion, err := NewSuggestion(settings.weekId, c.String("user"), MovieFromString(c.Args().First()))
+	suggestion, err := NewSuggestion(settings.weekID, c.String("user"), MovieFromString(c.Args().First()))
 	if err != nil {
 		c.App.Writer.Write([]byte(err.Error() + "\n"))
 		return err
@@ -257,7 +257,7 @@ func listMoviesAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := NewSuggestionPersistance(settings.weekId)
+	db, err := NewSuggestionPersistance(settings.weekID)
 	if err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func removeMovieAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := NewSuggestionPersistance(settings.weekId)
+	db, err := NewSuggestionPersistance(settings.weekID)
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func removeMovieAction(c *cli.Context) error {
 		return writeErr
 	}
 
-	if settings.curPeriod.name != SUGGESTING && !c.Bool("bypass") {
+	if settings.curPeriod.name != Suggesting && !c.Bool("bypass") {
 		_, writeErr := c.App.Writer.Write([]byte("Sorry, unable to remove the movie from suggestions. The suggestion period has already ended.\n"))
 		return writeErr
 	}

@@ -7,10 +7,10 @@ import (
 type PeriodName int32
 
 const (
-	SUGGESTING PeriodName = iota
-	VOTING
-	MOVIENIGHT
-	SLEEP
+	Suggesting PeriodName = iota
+	Voting
+	MovieNight
+	Sleep
 )
 
 // Configuration is based on a single 7 day week, with the seggestion
@@ -31,7 +31,7 @@ type AppSettings struct {
 	config       AppConfig
 	curPeriod    Period
 	localization time.Location
-	weekId       WeekId
+	weekID       WeekID
 	curDay       time.Time // This is the current day with no time.
 }
 
@@ -67,13 +67,13 @@ func (settings *AppSettings) setTime(now time.Time) {
 	now = now.In(&settings.localization)
 	settings.curDay = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0,
 		0, &settings.localization)
-	settings.weekId = WeekIdFromTime(now)
+	settings.weekID = WeekIDFromTime(now)
 	settings.curPeriod = calculatePeriod(settings.config, settings.curDay)
 }
 
 func calculatePeriod(cfg AppConfig, now time.Time) Period {
 	curPeriod := Period{
-		name:     SLEEP,
+		name:     Sleep,
 		daysLeft: 0,
 	}
 
@@ -83,17 +83,17 @@ func calculatePeriod(cfg AppConfig, now time.Time) Period {
 	movieNightPeriodEnd := votingPeriodEnd.AddDate(0, 0, cfg.movieNightPeriodInDays)
 
 	if now.After(suggestionPeriodStart) && now.Before(suggestionPeriodEnd.AddDate(0, 0, 1)) {
-		curPeriod.name = SUGGESTING
+		curPeriod.name = Suggesting
 		curPeriod.daysLeft = int(suggestionPeriodEnd.Sub(now).Hours()) / 24
 	}
 
 	if now.After(suggestionPeriodEnd) && now.Before(votingPeriodEnd.AddDate(0, 0, 1)) {
-		curPeriod.name = VOTING
+		curPeriod.name = Voting
 		curPeriod.daysLeft = int(votingPeriodEnd.Sub(now).Hours()) / 24
 	}
 
 	if now.After(votingPeriodEnd) && now.Before(movieNightPeriodEnd.AddDate(0, 0, 1)) {
-		curPeriod.name = MOVIENIGHT
+		curPeriod.name = MovieNight
 		curPeriod.daysLeft = int(movieNightPeriodEnd.Sub(now).Hours()) / 24
 	}
 

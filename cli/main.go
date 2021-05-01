@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	appId := uuid.New().String()
+	appID := uuid.New().String()
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Format(time.RFC3339)
 	errorLogName := fmt.Sprintf("logs/%s.error.log", today)
@@ -22,7 +22,7 @@ func main() {
 	errorLogFile, errorLogFileErr := os.OpenFile(errorLogName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 
 	if errorLogFileErr != nil {
-		log.Fatalf("[error] %s error creating logfile %v", appId, errorLogFileErr)
+		log.Fatalf("[error] %s error creating logfile %v", appID, errorLogFileErr)
 	}
 	defer errorLogFile.Close()
 
@@ -62,8 +62,8 @@ func main() {
 	cliErr := app.Run(os.Args)
 	if cliErr != nil {
 		log.Printf("[error] %s %s",
-			appId,
+			appID,
 			strings.Join(os.Args, " "))
-		log.Fatalf("[error] %s %v", appId, cliErr)
+		log.Fatalf("[error] %s %v", appID, cliErr)
 	}
 }

@@ -5,18 +5,18 @@ import (
 	"time"
 )
 
-type WeekId struct {
+type WeekID struct {
 	IsoYear int
 	IsoWeek int
 }
 
-func (w WeekId) String() string {
+func (w WeekID) String() string {
 	return fmt.Sprintf("%d%02d", w.IsoYear, w.IsoWeek)
 }
 
-func WeekIdFromTime(t time.Time) WeekId {
+func WeekIDFromTime(t time.Time) WeekID {
 	isoYear, isoWeek := t.ISOWeek()
-	return WeekId{
+	return WeekID{
 		IsoYear: isoYear,
 		IsoWeek: isoWeek,
 	}

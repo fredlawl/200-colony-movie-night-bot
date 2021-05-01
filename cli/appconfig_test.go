@@ -10,7 +10,7 @@ func TestGivenASuggestionPeriodDateStateIsInSuggesting(t *testing.T) {
 	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 5, 0, 0, 0, 0, &settings.localization)
 
-	expected := SUGGESTING
+	expected := Suggesting
 	actual := calculatePeriod(cfg, now)
 
 	if expected != actual.name || actual.daysLeft != 2 {
@@ -23,7 +23,7 @@ func TestGivenAEndSuggestionPeriodDateStateIsInSuggesting(t *testing.T) {
 	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 7, 0, 0, 0, 0, &settings.localization)
 
-	expected := SUGGESTING
+	expected := Suggesting
 	actual := calculatePeriod(cfg, now)
 
 	if expected != actual.name || actual.daysLeft != 0 {
@@ -36,7 +36,7 @@ func TestGivenAVotingDateStateIsInVoting(t *testing.T) {
 	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 8, 0, 0, 0, 0, &settings.localization)
 
-	expected := VOTING
+	expected := Voting
 	actual := calculatePeriod(cfg, now)
 
 	if expected != actual.name || actual.daysLeft != 0 {
@@ -49,7 +49,7 @@ func TestGivenAMovieNightDateStateIsInMovienight(t *testing.T) {
 	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 9, 0, 0, 0, 0, &settings.localization)
 
-	expected := MOVIENIGHT
+	expected := MovieNight
 	actual := calculatePeriod(cfg, now)
 
 	if expected != actual.name || actual.daysLeft != 0 {
@@ -62,7 +62,7 @@ func TestGivenASleepDateStateIsInSleep(t *testing.T) {
 	settings, _ := CreateAppSettings(cfg)
 	now := time.Date(2021, 4, 10, 0, 0, 0, 0, &settings.localization)
 
-	expected := SLEEP
+	expected := Sleep
 	actual := calculatePeriod(cfg, now)
 
 	if expected != actual.name || actual.daysLeft != 0 {
