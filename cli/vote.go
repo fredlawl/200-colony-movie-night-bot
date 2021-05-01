@@ -1,23 +1,58 @@
 package main
 
-import "github.com/urfave/cli/v2"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/google/uuid"
+	"github.com/urfave/cli/v2"
+)
 
 type VoteID string
 
 type Vote struct {
-	VoteID       VoteID
-	SuggestionID SuggestionID
-	Author       string
-	Preference   uint
+	VoteID            VoteID
+	SuggestionOrderID SuggestionOrderID
+	Author            string
+	Preference        uint
 }
 
 func castVotesAction(c *cli.Context) error {
 	cfg := DefaultConfiguration()
-	_, settingsErr := CreateAppSettings(cfg)
+	settings, settingsErr := CreateAppSettings(cfg)
 
 	if settingsErr != nil {
 		return settingsErr
 	}
+
+	if c.NArg() < 1 {
+		_, writeErr := c.App.Writer.Write([]byte("You must make at least one vote.\n"))
+		return writeErr
+	}
+
+	if settings.curPeriod.name != Voting && !c.Bool("bypass") {
+		_, writeErr := c.App.Writer.Write([]byte("Sorry, unable to cast votes. The vote period has already ended.\n"))
+		return writeErr
+	}
+
+	votes := make([]Vote, c.NArg())
+	for i := 0; i < len(votes); i++ {
+		suggestionOrderIDArg := c.Args().Get(i)
+		suggestionOrderID, parseErr := strconv.ParseUint(suggestionOrderIDArg, 10, 64)
+		if parseErr != nil {
+			_, writeErr := c.App.Writer.Write([]byte(fmt.Sprintf("\"%s\" is not a valid movie id.\n", suggestionOrderIDArg)))
+			return writeErr
+		}
+
+		votes[i] = Vote{
+			VoteID:            VoteID(uuid.New().String()),
+			SuggestionOrderID: SuggestionOrderID(suggestionOrderID),
+			Author:            c.String("user"),
+			Preference:        uint(i + 1),
+		}
+	}
+
+	// TODO: Bulk create votes
 
 	return nil
 }
