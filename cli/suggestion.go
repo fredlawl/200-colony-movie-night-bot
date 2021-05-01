@@ -126,11 +126,7 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-
-	return nil
+	return tx.Commit()
 }
 
 func (context *SuggestionPersistanceContext) AllSuggestions(callback func(key []byte, suggestion *Suggestion) error) error {
