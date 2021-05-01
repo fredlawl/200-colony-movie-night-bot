@@ -10,6 +10,7 @@ RUN go get -v github.com/ramya-rao-a/go-outline
 RUN go get -v golang.org/x/lint/golint
 RUN go get -v golang.org/x/tools/refactor/rename
 RUN go get -v github.com/godoctor/godoctor
+RUN go get -v honnef.co/go/tools/cmd/staticcheck
 
 RUN cd cli && go mod tidy
 RUN cd bot && go mod tidy
