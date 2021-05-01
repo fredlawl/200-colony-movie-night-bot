@@ -16,6 +16,7 @@ const SuggestionBucketName string = "suggestions"
 const SuggestedBucketLookupName string = "lookup"
 
 type SuggestionID string
+type SuggestionOrderID uint64
 
 func (SuggestionId SuggestionID) String() string {
 	return string(SuggestionId)
@@ -26,7 +27,7 @@ type Suggestion struct {
 	WeekID WeekID
 	Author string
 	Movie  Movie
-	Order  uint64
+	Order  SuggestionOrderID
 }
 
 func NewSuggestion(weekID WeekID, author string, movie Movie) (*Suggestion, error) {
@@ -103,7 +104,7 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 	if err != nil {
 		return err
 	}
-	s.Order = orderID
+	s.Order = SuggestionOrderID(orderID)
 
 	if buf, err := json.Marshal(s); err != nil {
 		return err
@@ -115,7 +116,7 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 	//  1. Order
 	//  2. Movie encoding
 	// This allows people to either type the movie name, hash, or order to make a vote
-	orderLookupKey := context.OrderLookupKey(orderID)
+	orderLookupKey := context.OrderLookupKey(SuggestionOrderID(orderID))
 	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(s.ID.String())); err != nil {
 		return err
 	}
@@ -156,8 +157,8 @@ func (context *SuggestionPersistanceContext) AllSuggestions(callback func(key []
 }
 
 // OrderLookupKey Given a orderId number, returns order:[number]
-func (context *SuggestionPersistanceContext) OrderLookupKey(orderID uint64) string {
-	return fmt.Sprintf("%s:%s", "order", strconv.FormatUint(orderID, 10))
+func (context *SuggestionPersistanceContext) OrderLookupKey(orderID SuggestionOrderID) string {
+	return fmt.Sprintf("%s:%s", "order", strconv.FormatUint(uint64(orderID), 10))
 }
 
 // MovieHashLookupKey Given a movie, returns move:[moviehash]
@@ -166,7 +167,7 @@ func (context *SuggestionPersistanceContext) MovieHashLookupKey(movie Movie) str
 }
 
 // GetSuggestionByOrder Given the order id, return the suggestion at that position
-func (context *SuggestionPersistanceContext) GetSuggestionByOrder(orderID uint64) (*Suggestion, error) {
+func (context *SuggestionPersistanceContext) GetSuggestionByOrder(orderID SuggestionOrderID) (*Suggestion, error) {
 	var suggestion Suggestion
 
 	err := context.db.View(func(tx *bolt.Tx) error {
@@ -309,7 +310,7 @@ func removeMovieAction(c *cli.Context) error {
 	}
 
 	// Need to first get a suggestion
-	foundSuggestion, err := db.GetSuggestionByOrder(orderID)
+	foundSuggestion, err := db.GetSuggestionByOrder(SuggestionOrderID(orderID))
 	if err != nil {
 		_, _ = c.App.Writer.Write([]byte("Unable to find a matching suggestion.\n"))
 		return err
