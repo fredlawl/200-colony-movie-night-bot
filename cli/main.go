@@ -56,6 +56,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			SuggestionCliCommand(),
+			VoteCliCommand(),
 		},
 	}
 
