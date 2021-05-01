@@ -188,6 +188,23 @@ func (context *SuggestionPersistanceContext) GetSuggestionByOrder(orderID uint64
 	return &suggestion, err
 }
 
+func (context *SuggestionPersistanceContext) Remove(s *Suggestion) error {
+	return context.db.Update(func(tx *bolt.Tx) error {
+		weekBucket := tx.Bucket([]byte(context.weekId.String()))
+		lookupBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_LOOKUP_NAME))
+		suggestionsBucket := weekBucket.Bucket([]byte(SUGGESTION_BUCKET_NAME))
+
+		orderIdKey := context.OrderLookupKey(s.Order)
+		hashKey := context.MovieHashLookupKey(s.Movie)
+
+		lookupBucket.Delete([]byte(orderIdKey))
+		lookupBucket.Delete([]byte(hashKey))
+		suggestionsBucket.Delete([]byte(s.Id.String()))
+
+		return nil
+	})
+}
+
 // Close Closes the persistence context
 func (context *SuggestionPersistanceContext) Close() {
 	context.db.Close()
@@ -305,6 +322,10 @@ func removeMovieAction(c *cli.Context) error {
 	}
 
 	// Remove suggestion
+	if suggestionRemoveErr := db.Remove(foundSuggestion); suggestionRemoveErr != nil {
+		_, _ = c.App.Writer.Write([]byte("Unable to remove suggestion from DB.\n"))
+		return suggestionRemoveErr
+	}
 
 	return nil
 }
@@ -315,6 +336,11 @@ func SuggestionCliCommand() *cli.Command {
 
 Add suggestion:
     mov suggestions suggest "[movie name]"
+
+Remove suggestion:
+	mov suggestions remove [id]
+
+	Only users may remove their own suggestions.
 `
 
 	return &cli.Command{
