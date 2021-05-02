@@ -356,7 +356,7 @@ func SuggestionCliCommand() *cli.Command {
     mov suggestions list
 
 Add suggestion:
-    mov suggestions suggest "[movie name]"
+    mov suggestions add "[movie name]"
 
 Remove suggestion:
 	mov suggestions remove [id]
@@ -377,8 +377,8 @@ Remove suggestion:
 				Action:  listMoviesAction,
 			},
 			{
-				Name:    "suggest",
-				Aliases: []string{"s"},
+				Name:    "add",
+				Aliases: []string{"a"},
 				Usage:   "Suggest a movie",
 				Action:  suggestMovieAction,
 			},
