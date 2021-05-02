@@ -97,9 +97,6 @@ func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
 	suggestionBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
 	lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
 
-	// TODO: Check if movie currently exists prior to save, this will work
-	//   based off the suggestion order or movie encoding
-
 	orderID, err := suggestionBucket.NextSequence()
 	if err != nil {
 		return err
@@ -185,6 +182,22 @@ func (context *SuggestionPersistanceContext) GetSuggestionByOrder(orderID Sugges
 	return &suggestion, err
 }
 
+func (context *SuggestionPersistanceContext) HasMovie(movie Movie) (bool, error) {
+	var found bool
+
+	err := context.db.View(func(tx *bolt.Tx) error {
+		weekBucket := tx.Bucket([]byte(context.weekID.String()))
+		lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
+
+		foundSuggestion := lookupBucket.Get([]byte(context.MovieHashLookupKey(movie)))
+		found = foundSuggestion != nil
+
+		return nil
+	})
+
+	return found, err
+}
+
 func (context *SuggestionPersistanceContext) Remove(s *Suggestion) error {
 	return context.db.Update(func(tx *bolt.Tx) error {
 		weekBucket := tx.Bucket([]byte(context.weekID.String()))
@@ -235,6 +248,17 @@ func suggestMovieAction(c *cli.Context) error {
 	if err != nil {
 		c.App.Writer.Write([]byte(err.Error() + "\n"))
 		return err
+	}
+
+	movieExists, movieExistsErr := db.HasMovie(suggestion.Movie)
+	if movieExists {
+		c.App.Writer.Write([]byte(fmt.Sprintf("Movie \"%s\" was already suggested.\n", suggestion.Movie.String())))
+		return nil
+	}
+
+	if movieExistsErr != nil {
+		c.App.Writer.Write([]byte("Unable to save this movie.\n"))
+		return movieExistsErr
 	}
 
 	saveErr := db.Save(*suggestion)
