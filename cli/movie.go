@@ -18,7 +18,7 @@ func (m Movie) String() string {
 }
 
 func (m Movie) Encode() string {
-	pattern := regexp.MustCompile(`[~!@#\$%\^&\*\(\)-=_\+,\.<>\/\?;:'\\"\[{\]}\\\|\s]`)
+	pattern := regexp.MustCompile(`[~!@#\$%\^&\*\(\)\-=_\+,\.<>\/\?;:'\\"\[{\]}\\\|\s]`)
 	encoded :=
 		removeVowlesSpacesSuccessiveCharacters(
 			removeArticles(

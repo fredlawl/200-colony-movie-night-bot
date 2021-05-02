@@ -1,10 +1,22 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGivenMovieNameOfSpecialCharactersThenCharactersReplaced(t *testing.T) {
 	movie := MovieFromString("~!@#$%^&*()-=_+,.<>/?;:'\"[{]}\\| ")
 	expected := ""
+	actual := movie.Encode()
+
+	if actual != expected {
+		t.Fail()
+	}
+}
+
+func TestGivenMovieNameDigitsOnEncodeDigitsAreNotReplaced(t *testing.T) {
+	movie := MovieFromString("1")
+	expected := "1"
 	actual := movie.Encode()
 
 	if actual != expected {
