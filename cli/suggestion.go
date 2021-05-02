@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -288,12 +289,23 @@ func listMoviesAction(c *cli.Context) error {
 
 	outputBuffer.WriteString(fmt.Sprintf("%-4s%-.32s\n", "ID", "Movie"))
 
+	var suggestions = make([]Suggestion, 0, 10)
+	var i = 0
 	listerr := db.AllSuggestions(func(k []byte, s *Suggestion) error {
+		suggestions = append(suggestions, *s)
+		i++
+		return nil
+	})
+
+	sort.Slice(suggestions, func(i, j int) bool {
+		return suggestions[i].Order < suggestions[j].Order
+	})
+
+	for _, s := range suggestions {
 		outputBuffer.WriteString(fmt.Sprintf("%-4d%-.32s\n",
 			s.Order,
 			s.Movie.String()))
-		return nil
-	})
+	}
 
 	if listerr != nil {
 		return listerr
