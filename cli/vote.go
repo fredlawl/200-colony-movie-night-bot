@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/boltdb/bolt"
@@ -24,6 +26,11 @@ const VoteBucketName string = "votes"
 type VotePersistanceContext struct {
 	db     *bolt.DB
 	weekID WeekID
+}
+
+type BulkVoteResult struct {
+	err  error
+	vote Vote
 }
 
 func NewVotePersistance(week WeekID) (*VotePersistanceContext, error) {
@@ -57,29 +64,37 @@ func NewVotePersistance(week WeekID) (*VotePersistanceContext, error) {
 	}, nil
 }
 
-func (context *VotePersistanceContext) BulkSaveVotes(votes []Vote) error {
+func (context *VotePersistanceContext) BulkSaveVotes(votes []Vote) ([]BulkVoteResult, error) {
+	emptyBulkResult := []BulkVoteResult{}
+
 	tx, err := context.db.Begin(true)
 	if err != nil {
-		return err
+		return emptyBulkResult, err
 	}
 	defer tx.Rollback()
-
-	if len(votes) == 0 {
-		return tx.Rollback()
-	}
 
 	weekBucket := tx.Bucket([]byte(context.weekID.String()))
 	voteBucket := weekBucket.Bucket([]byte(VoteBucketName))
 
-	for _, v := range votes {
+	var hasErrors = false
+	var bulkResults = make([]BulkVoteResult, len(votes))
+	for i, v := range votes {
+		bulkResults[i].vote = v
+
 		if buf, err := json.Marshal(v); err != nil {
-			return err
+			bulkResults[i].err = err
+			hasErrors = true
 		} else if err := voteBucket.Put([]byte(v.VoteID), buf); err != nil {
-			return err
+			bulkResults[i].err = err
+			hasErrors = true
 		}
 	}
 
-	return tx.Commit()
+	if hasErrors {
+		return bulkResults, tx.Rollback()
+	}
+
+	return bulkResults, tx.Commit()
 }
 
 // Close Closes the persistence context
@@ -128,7 +143,29 @@ func castVotesAction(c *cli.Context) error {
 	}
 	defer db.Close()
 
-	return db.BulkSaveVotes(votes)
+	saveResults, err := db.BulkSaveVotes(votes)
+	if err != nil {
+		c.App.Writer.Write([]byte("Unable to save votes. Something went wrong with the transaction.\n"))
+		return err
+	}
+
+	var hasErr = false
+	for _, sr := range saveResults {
+		if sr.err == nil {
+			continue
+		}
+
+		log.Printf("[error] %v", sr.err)
+		c.App.Writer.Write([]byte(fmt.Sprintf("Vote for suggestion %d resulted in an error.\n", sr.vote.SuggestionOrderID)))
+		hasErr = true
+	}
+
+	if hasErr {
+		c.App.Writer.Write([]byte("Unable to save votes. Something went wrong with the transaction.\n"))
+		return errors.New("END of vote bulk save errors")
+	}
+
+	return nil
 }
 
 func VoteCliCommand() *cli.Command {
