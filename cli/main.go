@@ -27,6 +27,7 @@ func main() {
 	defer errorLogFile.Close()
 
 	log.SetOutput(errorLogFile)
+	log.SetPrefix(appID + " - ")
 
 	app := &cli.App{
 		Name:     "mov",
@@ -62,9 +63,8 @@ func main() {
 
 	cliErr := app.Run(os.Args)
 	if cliErr != nil {
-		log.Printf("[error] %s %s",
-			appID,
+		log.Printf("[error] %s",
 			strings.Join(os.Args, " "))
-		log.Fatalf("[error] %s %v", appID, cliErr)
+		log.Fatalf("[error] %v", cliErr)
 	}
 }
