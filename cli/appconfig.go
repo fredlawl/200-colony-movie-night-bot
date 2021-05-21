@@ -20,6 +20,7 @@ type AppConfig struct {
 	suggestionPeriodInDays int
 	votePeriodInDays       int
 	movieNightPeriodInDays int
+	dbFilePath             string
 }
 
 type Period struct {
@@ -41,6 +42,7 @@ func DefaultConfiguration() AppConfig {
 		suggestionPeriodInDays: 3,
 		votePeriodInDays:       1,
 		movieNightPeriodInDays: 1,
+		dbFilePath:             "./sqlite-cli.db",
 	}
 }
 
