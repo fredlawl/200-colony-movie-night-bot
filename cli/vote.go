@@ -1,13 +1,12 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
 	"strconv"
 
-	"github.com/boltdb/bolt"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 )
@@ -17,15 +16,13 @@ type VoteID string
 type Vote struct {
 	VoteID            VoteID
 	SuggestionOrderID SuggestionOrderID
+	WeekID            WeekID
 	Author            string
 	Preference        uint
 }
 
-const VoteBucketName string = "votes"
-
-type VotePersistanceContext struct {
-	db     *bolt.DB
-	weekID WeekID
+type VoteRepository struct {
+	session *sql.DB
 }
 
 type BulkVoteResult struct {
@@ -33,73 +30,48 @@ type BulkVoteResult struct {
 	vote Vote
 }
 
-func NewVotePersistance(week WeekID) (*VotePersistanceContext, error) {
-	db, err := bolt.Open("cli.db", 0600, nil)
-	if err != nil {
-		return nil, err
+func NewVoteRepository(session *sql.DB) *VoteRepository {
+	return &VoteRepository{
+		session: session,
 	}
-
-	dbErr := db.Update(func(tx *bolt.Tx) error {
-		weekBucket, err := tx.CreateBucketIfNotExists([]byte(week.String()))
-		if err != nil {
-			return err
-		}
-
-		_, serr := weekBucket.CreateBucketIfNotExists([]byte(VoteBucketName))
-		if serr != nil {
-			return serr
-		}
-
-		return nil
-	})
-
-	if dbErr != nil {
-		db.Close()
-		return nil, err
-	}
-
-	return &VotePersistanceContext{
-		db:     db,
-		weekID: week,
-	}, nil
 }
 
-func (context *VotePersistanceContext) BulkSaveVotes(votes []Vote) ([]BulkVoteResult, error) {
+func (context *VoteRepository) BulkSaveVotes(votes []Vote) ([]BulkVoteResult, error) {
 	emptyBulkResult := []BulkVoteResult{}
 
-	tx, err := context.db.Begin(true)
+	context.session.Exec("PRAGMA foreign_keys = ON;")
+
+	tx, err := context.session.Begin()
 	if err != nil {
 		return emptyBulkResult, err
 	}
-	defer tx.Rollback()
 
-	weekBucket := tx.Bucket([]byte(context.weekID.String()))
-	voteBucket := weekBucket.Bucket([]byte(VoteBucketName))
+	stmt, err := context.session.Prepare(`
+		INSERT INTO votes (suggestionID, weekID, author, preference)
+		VALUES (?, ?, ?, ?)
+	`)
+	if err != nil {
+		return emptyBulkResult, tx.Rollback()
+	}
 
 	var hasErrors = false
 	var bulkResults = make([]BulkVoteResult, len(votes))
 	for i, v := range votes {
 		bulkResults[i].vote = v
-
-		if buf, err := json.Marshal(v); err != nil {
-			bulkResults[i].err = err
-			hasErrors = true
-		} else if err := voteBucket.Put([]byte(v.VoteID), buf); err != nil {
-			bulkResults[i].err = err
-			hasErrors = true
-		}
+		_, bulkResults[i].err = tx.Stmt(stmt).Exec(v.SuggestionOrderID,
+			v.WeekID.String(), v.Author, v.Preference)
 	}
 
+	var txErr error
 	if hasErrors {
-		return bulkResults, tx.Rollback()
+		txErr = tx.Rollback()
+	} else {
+		txErr = tx.Commit()
 	}
 
-	return bulkResults, tx.Commit()
-}
+	context.session.Exec("PRAGMA foreign_keys = OFF;")
 
-// Close Closes the persistence context
-func (context *VotePersistanceContext) Close() {
-	context.db.Close()
+	return bulkResults, txErr
 }
 
 func castVotesAction(c *cli.Context) error {
@@ -125,7 +97,7 @@ func castVotesAction(c *cli.Context) error {
 		suggestionOrderIDArg := c.Args().Get(i)
 		suggestionOrderID, parseErr := strconv.ParseUint(suggestionOrderIDArg, 10, 64)
 		if parseErr != nil {
-			_, writeErr := c.App.Writer.Write([]byte(fmt.Sprintf("\"%s\" is not a valid movie id.\n", suggestionOrderIDArg)))
+			_, writeErr := c.App.Writer.Write([]byte(fmt.Sprintf("\"%s\" is not a valid movie ID.\n", suggestionOrderIDArg)))
 			return writeErr
 		}
 
@@ -134,16 +106,19 @@ func castVotesAction(c *cli.Context) error {
 			SuggestionOrderID: SuggestionOrderID(suggestionOrderID),
 			Author:            c.String("user"),
 			Preference:        uint(i + 1),
+			WeekID:            settings.weekID,
 		}
 	}
 
-	db, err := NewVotePersistance(settings.weekID)
+	dbSession, err := sql.Open("sqlite3", settings.config.dbFilePath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer dbSession.Close()
 
-	saveResults, err := db.BulkSaveVotes(votes)
+	voteRepository := NewVoteRepository(dbSession)
+
+	saveResults, err := voteRepository.BulkSaveVotes(votes)
 	if err != nil {
 		c.App.Writer.Write([]byte("Unable to save votes. Something went wrong with the transaction.\n"))
 		return err
@@ -170,7 +145,7 @@ func castVotesAction(c *cli.Context) error {
 
 func VoteCliCommand() *cli.Command {
 	description := `Vote for a movie in order of preference:
-    mov votes cast [SuggestionID 1], [SuggestionID 2], ... [SuggestionID N]
+    mov votes cast [Suggestion ID 1], [Suggestion ID 2], ... [Suggestion ID N]
 
 	To recast votes, this command must be written again. All previous votes will be nullified and replaced with this new order.
 `
