@@ -1,20 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/boltdb/bolt"
 	"github.com/google/uuid"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/urfave/cli/v2"
 )
-
-const SuggestionBucketName string = "suggestions"
-const SuggestedBucketLookupName string = "lookup"
 
 type SuggestionID string
 type SuggestionOrderID uint64
@@ -46,179 +42,122 @@ func NewSuggestion(weekID WeekID, author string, movie Movie) (*Suggestion, erro
 	}, nil
 }
 
-type SuggestionPersistanceContext struct {
-	db     *bolt.DB
-	weekID WeekID
+type SuggestionRepository struct {
+	session *sql.DB
 }
 
-func NewSuggestionPersistance(week WeekID) (*SuggestionPersistanceContext, error) {
-	db, err := bolt.Open("cli.db", 0600, nil)
+func NewSuggestionRepository(session *sql.DB) *SuggestionRepository {
+	return &SuggestionRepository{
+		session: session,
+	}
+}
+
+func (context *SuggestionRepository) Save(s Suggestion) error {
+	stmt, err := context.session.Prepare(
+		`INSERT INTO suggestions (
+			uuid,
+			weekID,
+			author,
+			movie,
+			movieHash
+		) VALUES (
+			?,
+			?,
+			?,
+			?,
+			?
+		)`)
+
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	dbErr := db.Update(func(tx *bolt.Tx) error {
-		weekBucket, err := tx.CreateBucketIfNotExists([]byte(week.String()))
+	_, err = stmt.Exec(s.ID.String(), s.WeekID.String(), s.Author,
+		s.Movie.String(), s.Movie.Encode())
+
+	return err
+}
+
+func (context *SuggestionRepository) AllSuggestions(weekID WeekID, callback func(key []byte, suggestion *Suggestion) error) {
+	stmt, err := context.session.Prepare("SELECT id, uuid, author, movie FROM suggestions WHERE weekID = ? ORDER BY id ASC")
+	if err != nil {
+		return
+	}
+
+	rows, err := stmt.Query(weekID.String())
+	if err != nil {
+		return
+	}
+
+	var id int
+	var suggestionID string
+	var author string
+	var movie string
+
+	for rows.Next() {
+		err = rows.Scan(&id, &suggestionID, &author, &movie)
 		if err != nil {
-			return err
+			return
 		}
 
-		_, serr := weekBucket.CreateBucketIfNotExists([]byte(SuggestionBucketName))
-		if serr != nil {
-			return serr
+		err = callback(
+			[]byte(suggestionID),
+			&Suggestion{
+				ID:     SuggestionID(suggestionID),
+				WeekID: weekID,
+				Author: author,
+				Movie:  MovieFromString(movie),
+				Order:  SuggestionOrderID(id),
+			})
+
+		if err != nil {
+			return
 		}
-
-		_, lerr := weekBucket.CreateBucketIfNotExists([]byte(SuggestedBucketLookupName))
-		if lerr != nil {
-			return lerr
-		}
-
-		return nil
-	})
-
-	if dbErr != nil {
-		db.Close()
-		return nil, err
 	}
-
-	return &SuggestionPersistanceContext{
-		db:     db,
-		weekID: week,
-	}, nil
-}
-
-func (context *SuggestionPersistanceContext) Save(s Suggestion) error {
-	tx, err := context.db.Begin(true)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	weekBucket := tx.Bucket([]byte(s.WeekID.String()))
-	suggestionBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
-	lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
-
-	orderID, err := suggestionBucket.NextSequence()
-	if err != nil {
-		return err
-	}
-	s.Order = SuggestionOrderID(orderID)
-
-	if buf, err := json.Marshal(s); err != nil {
-		return err
-	} else if err := suggestionBucket.Put([]byte(s.ID.String()), buf); err != nil {
-		return err
-	}
-
-	// Following two insertions creates two lookups per suggestion
-	//  1. Order
-	//  2. Movie encoding
-	// This allows people to either type the movie name, hash, or order to make a vote
-	orderLookupKey := context.OrderLookupKey(SuggestionOrderID(orderID))
-	if err := lookupBucket.Put([]byte(orderLookupKey), []byte(s.ID.String())); err != nil {
-		return err
-	}
-
-	movieHashLookupKey := context.MovieHashLookupKey(s.Movie)
-	if err := lookupBucket.Put([]byte(movieHashLookupKey), []byte(s.ID.String())); err != nil {
-		return err
-	}
-
-	return tx.Commit()
-}
-
-func (context *SuggestionPersistanceContext) AllSuggestions(callback func(key []byte, suggestion *Suggestion) error) error {
-	return context.db.View(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(context.weekID.String()))
-		suggestionsBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
-		cursor := suggestionsBucket.Cursor()
-
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			var suggestion Suggestion
-			unmarshalErr := json.Unmarshal(v, &suggestion)
-			if unmarshalErr != nil {
-				return unmarshalErr
-			}
-
-			err := callback(k, &suggestion)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
-// OrderLookupKey Given a orderId number, returns order:[number]
-func (context *SuggestionPersistanceContext) OrderLookupKey(orderID SuggestionOrderID) string {
-	return fmt.Sprintf("%s:%s", "order", strconv.FormatUint(uint64(orderID), 10))
-}
-
-// MovieHashLookupKey Given a movie, returns move:[moviehash]
-func (context *SuggestionPersistanceContext) MovieHashLookupKey(movie Movie) string {
-	return fmt.Sprintf("%s:%s", "hash", movie.Encode())
 }
 
 // GetSuggestionByOrder Given the order id, return the suggestion at that position
-func (context *SuggestionPersistanceContext) GetSuggestionByOrder(orderID SuggestionOrderID) (*Suggestion, error) {
-	var suggestion Suggestion
-
-	err := context.db.View(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(context.weekID.String()))
-		lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
-		suggestionsBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
-
-		key := lookupBucket.Get([]byte(context.OrderLookupKey(orderID)))
-		value := suggestionsBucket.Get([]byte(key))
-
-		unmarshalErr := json.Unmarshal(value, &suggestion)
-		if unmarshalErr != nil {
-			return unmarshalErr
-		}
-
+func (context *SuggestionRepository) GetSuggestionByOrder(orderID SuggestionOrderID) *Suggestion {
+	stmt, err := context.session.Prepare("SELECT id, uuid, weekID, author, movie FROM suggestions WHERE id = ?")
+	if err != nil {
 		return nil
-	})
+	}
 
-	return &suggestion, err
+	row := stmt.QueryRow(orderID)
+
+	var id int
+	var suggestionID string
+	var weekID string
+	var author string
+	var movie string
+
+	err = row.Scan(&id, &suggestionID, &weekID, &author, &movie)
+	if err != nil {
+		return nil
+	}
+
+	parsedWeekID, _ := WeekIDFromString(weekID)
+
+	return &Suggestion{
+		ID:     SuggestionID(suggestionID),
+		WeekID: *parsedWeekID,
+		Author: author,
+		Movie:  MovieFromString(movie),
+		Order:  SuggestionOrderID(id),
+	}
 }
 
-func (context *SuggestionPersistanceContext) HasMovie(movie Movie) (bool, error) {
-	var found bool
+func (context *SuggestionRepository) Remove(s Suggestion) error {
+	context.session.Exec("PRAGMA foreign_keys = ON;")
+	stmt, err := context.session.Prepare("DELETE FROM suggestions WHERE uuid = ?")
+	if err != nil {
+		return err
+	}
 
-	err := context.db.View(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(context.weekID.String()))
-		lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
+	_, err = stmt.Exec(s.ID.String())
 
-		foundSuggestion := lookupBucket.Get([]byte(context.MovieHashLookupKey(movie)))
-		found = foundSuggestion != nil
-
-		return nil
-	})
-
-	return found, err
-}
-
-func (context *SuggestionPersistanceContext) Remove(s *Suggestion) error {
-	return context.db.Update(func(tx *bolt.Tx) error {
-		weekBucket := tx.Bucket([]byte(context.weekID.String()))
-		lookupBucket := weekBucket.Bucket([]byte(SuggestedBucketLookupName))
-		suggestionsBucket := weekBucket.Bucket([]byte(SuggestionBucketName))
-
-		orderIDKey := context.OrderLookupKey(s.Order)
-		hashKey := context.MovieHashLookupKey(s.Movie)
-
-		lookupBucket.Delete([]byte(orderIDKey))
-		lookupBucket.Delete([]byte(hashKey))
-		suggestionsBucket.Delete([]byte(s.ID.String()))
-
-		return nil
-	})
-}
-
-// Close Closes the persistence context
-func (context *SuggestionPersistanceContext) Close() {
-	context.db.Close()
+	context.session.Exec("PRAGMA foreign_keys = OFF;")
+	return err
 }
 
 func suggestMovieAction(c *cli.Context) error {
@@ -229,11 +168,13 @@ func suggestMovieAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := NewSuggestionPersistance(settings.weekID)
+	dbSession, err := sql.Open("sqlite3", settings.config.dbFilePath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer dbSession.Close()
+
+	suggestionRepository := NewSuggestionRepository(dbSession)
 
 	if c.NArg() < 1 {
 		_, writeErr := c.App.Writer.Write([]byte("Movie name not provided as argument.\n"))
@@ -251,20 +192,9 @@ func suggestMovieAction(c *cli.Context) error {
 		return err
 	}
 
-	movieExists, movieExistsErr := db.HasMovie(suggestion.Movie)
-	if movieExists {
-		c.App.Writer.Write([]byte(fmt.Sprintf("Movie \"%s\" was already suggested.\n", suggestion.Movie.String())))
-		return nil
-	}
-
-	if movieExistsErr != nil {
-		c.App.Writer.Write([]byte("Unable to save this movie.\n"))
-		return movieExistsErr
-	}
-
-	saveErr := db.Save(*suggestion)
+	saveErr := suggestionRepository.Save(*suggestion)
 	if saveErr != nil {
-		c.App.Writer.Write([]byte("Unable to save this movie.\n"))
+		c.App.Writer.Write([]byte(fmt.Sprintf("Movie \"%s\" was already suggested.\n", suggestion.Movie.String())))
 		return saveErr
 	}
 
@@ -279,37 +209,24 @@ func listMoviesAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := NewSuggestionPersistance(settings.weekID)
+	dbSession, err := sql.Open("sqlite3", settings.config.dbFilePath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer dbSession.Close()
+
+	suggestionRepository := NewSuggestionRepository(dbSession)
 
 	var outputBuffer strings.Builder
 
 	outputBuffer.WriteString(fmt.Sprintf("%-4s%-.32s\n", "ID", "Movie"))
 
-	var suggestions = make([]Suggestion, 0, 10)
-	var i = 0
-	listerr := db.AllSuggestions(func(k []byte, s *Suggestion) error {
-		suggestions = append(suggestions, *s)
-		i++
-		return nil
-	})
-
-	sort.Slice(suggestions, func(i, j int) bool {
-		return suggestions[i].Order < suggestions[j].Order
-	})
-
-	for _, s := range suggestions {
+	suggestionRepository.AllSuggestions(settings.weekID, func(k []byte, s *Suggestion) error {
 		outputBuffer.WriteString(fmt.Sprintf("%-4d%-.32s\n",
 			s.Order,
 			s.Movie.String()))
-	}
-
-	if listerr != nil {
-		return listerr
-	}
+		return nil
+	})
 
 	c.App.Writer.Write([]byte(outputBuffer.String()))
 
@@ -324,11 +241,13 @@ func removeMovieAction(c *cli.Context) error {
 		return settingsErr
 	}
 
-	db, err := NewSuggestionPersistance(settings.weekID)
+	dbSession, err := sql.Open("sqlite3", settings.config.dbFilePath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer dbSession.Close()
+
+	suggestionRepository := NewSuggestionRepository(dbSession)
 
 	orderID, err := strconv.ParseUint(c.Args().First(), 10, 64)
 	if err != nil {
@@ -342,8 +261,8 @@ func removeMovieAction(c *cli.Context) error {
 	}
 
 	// Need to first get a suggestion
-	foundSuggestion, err := db.GetSuggestionByOrder(SuggestionOrderID(orderID))
-	if err != nil {
+	foundSuggestion := suggestionRepository.GetSuggestionByOrder(SuggestionOrderID(orderID))
+	if foundSuggestion == nil {
 		_, _ = c.App.Writer.Write([]byte("Unable to find a matching suggestion.\n"))
 		return err
 	}
@@ -355,9 +274,9 @@ func removeMovieAction(c *cli.Context) error {
 	}
 
 	// Remove suggestion
-	if suggestionRemoveErr := db.Remove(foundSuggestion); suggestionRemoveErr != nil {
+	if removeErr := suggestionRepository.Remove(*foundSuggestion); removeErr != nil {
 		_, _ = c.App.Writer.Write([]byte("Unable to remove suggestion from DB.\n"))
-		return suggestionRemoveErr
+		return removeErr
 	}
 
 	return nil

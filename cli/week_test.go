@@ -22,3 +22,19 @@ func TestGiveDateWithASingleDigitWeekWhenExecutedWeekIdGivesFormattedId(t *testi
 		t.Fail()
 	}
 }
+
+func TestGivenWeekIDStringConversionWorksCorrectly(t *testing.T) {
+	expected := &WeekID{
+		IsoYear: 2021,
+		IsoWeek: 20,
+	}
+
+	actual, err := WeekIDFromString("202120")
+	if err != nil {
+		t.Fail()
+	}
+
+	if !(expected.IsoYear == actual.IsoYear || expected.IsoWeek == actual.IsoWeek) {
+		t.Fail()
+	}
+}

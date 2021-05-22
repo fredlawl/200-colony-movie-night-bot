@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -20,4 +21,21 @@ func WeekIDFromTime(t time.Time) WeekID {
 		IsoYear: isoYear,
 		IsoWeek: isoWeek,
 	}
+}
+
+func WeekIDFromString(id string) (*WeekID, error) {
+	isoYear, err := strconv.Atoi(id[0:4])
+	if err != nil {
+		return nil, err
+	}
+
+	isoWeek, err := strconv.Atoi(id[4:])
+	if err != nil {
+		return nil, err
+	}
+
+	return &WeekID{
+		IsoYear: isoYear,
+		IsoWeek: isoWeek,
+	}, nil
 }
