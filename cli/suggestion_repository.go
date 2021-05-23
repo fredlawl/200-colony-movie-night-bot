@@ -1,12 +1,16 @@
 package main
 
-import "database/sql"
+import (
+	"database/sql"
+)
 
 type SuggestionRepository struct {
 	session *sql.DB
 }
 
 func NewSuggestionRepository(session *sql.DB) *SuggestionRepository {
+	// This could result in an error, but that's fine
+	session.Exec("PRAGMA foreign_keys = ON")
 	return &SuggestionRepository{
 		session: session,
 	}
@@ -108,14 +112,11 @@ func (context *SuggestionRepository) GetSuggestionByOrder(orderID SuggestionOrde
 }
 
 func (context *SuggestionRepository) Remove(s Suggestion) error {
-	context.session.Exec("PRAGMA foreign_keys = ON;")
 	stmt, err := context.session.Prepare("DELETE FROM suggestions WHERE uuid = ?")
 	if err != nil {
 		return err
 	}
 
 	_, err = stmt.Exec(s.ID.String())
-
-	context.session.Exec("PRAGMA foreign_keys = OFF;")
 	return err
 }

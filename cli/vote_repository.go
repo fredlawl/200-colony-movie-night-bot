@@ -12,6 +12,8 @@ type BulkVoteResult struct {
 }
 
 func NewVoteRepository(session *sql.DB) *VoteRepository {
+	// This could result in an error, but that's fine
+	session.Exec("PRAGMA foreign_keys = ON")
 	return &VoteRepository{
 		session: session,
 	}
@@ -19,8 +21,6 @@ func NewVoteRepository(session *sql.DB) *VoteRepository {
 
 func (context *VoteRepository) BulkSaveVotes(votes []Vote) ([]BulkVoteResult, error) {
 	emptyBulkResult := []BulkVoteResult{}
-
-	context.session.Exec("PRAGMA foreign_keys = ON;")
 
 	tx, err := context.session.Begin()
 	if err != nil {
@@ -46,14 +46,9 @@ func (context *VoteRepository) BulkSaveVotes(votes []Vote) ([]BulkVoteResult, er
 		}
 	}
 
-	var txErr error
 	if hasErrors {
-		txErr = tx.Rollback()
-	} else {
-		txErr = tx.Commit()
+		return bulkResults, tx.Rollback()
 	}
 
-	context.session.Exec("PRAGMA foreign_keys = OFF;")
-
-	return bulkResults, txErr
+	return bulkResults, tx.Commit()
 }
