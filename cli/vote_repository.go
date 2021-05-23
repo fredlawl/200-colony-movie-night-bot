@@ -28,7 +28,7 @@ func (context *VoteRepository) BulkSaveVotes(votes []Vote) ([]BulkVoteResult, er
 	}
 
 	stmt, err := context.session.Prepare(`
-		INSERT INTO votes (suggestionID, weekID, author, preference)
+		INSERT OR REPLACE INTO votes (suggestionID, weekID, author, preference)
 		VALUES (?, ?, ?, ?)
 	`)
 	if err != nil {
