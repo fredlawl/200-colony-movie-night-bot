@@ -41,6 +41,9 @@ func (context *VoteRepository) BulkSaveVotes(votes []Vote) ([]BulkVoteResult, er
 		bulkResults[i].vote = v
 		_, bulkResults[i].err = tx.Stmt(stmt).Exec(v.SuggestionOrderID,
 			v.WeekID.String(), v.Author, v.Preference)
+		if !hasErrors {
+			hasErrors = bulkResults[i].err != nil
+		}
 	}
 
 	var txErr error
