@@ -10,7 +10,7 @@ import (
 type Movie string
 
 func MovieFromString(s string) Movie {
-	return Movie(norm.NFD.String(s))
+	return Movie(norm.NFD.String(strings.TrimSpace(s)))
 }
 
 func (m Movie) String() string {
