@@ -18,3 +18,21 @@ CREATE TABLE IF NOT EXISTS votes (
     PRIMARY KEY(weekID, author, suggestionID),
     CONSTRAINT fk_votes_suggestionID FOREIGN KEY (suggestionID) REFERENCES suggestions(id) ON DELETE CASCADE 
 );
+CREATE VIEW IF NOT EXISTS vw_leaderboard
+AS
+SELECT
+    s.id AS suggestionID
+    , s.weekID
+    , s.movie
+    , v.preference
+    , COUNT(s.id) AS votes
+FROM suggestions s
+INNER JOIN votes v
+    ON v.suggestionID = s.id
+    AND v.weekID = s.weekID
+GROUP BY
+    s.id
+    , s.weekID
+    , s.movie
+    , v.preference
+ORDER BY v.preference ASC, movie ASC;
