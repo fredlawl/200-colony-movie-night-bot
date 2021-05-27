@@ -2,14 +2,22 @@ FROM golang:1.16.3-alpine3.13
 
 ENV CGO_ENABLED=1
 
-COPY . .
-
 RUN apk update
-RUN apk add sqlite
+RUN apk add bash shadow sqlite
 
 # Packages needed for setting up VS Code SQL extensions
 RUN apk add g++ make python3 nodejs npm
 RUN ln -sf python3 /usr/bin/python
+
+RUN groupadd -g 1000 docker
+RUN useradd -u 1000 -ms /bin/bash -g docker golang
+
+COPY --chown=golang:docker . /home/golang
+WORKDIR /home/golang
+
+USER golang
+
+VOLUME /home/golang
 
 RUN go get -v golang.org/x/tools/gopls
 RUN go get -v github.com/go-delve/delve/cmd/dlv
