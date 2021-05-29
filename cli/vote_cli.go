@@ -53,8 +53,10 @@ func castVotesAction(c *cli.Context) error {
 		return writeErr
 	}
 
-	votes := make([]Vote, c.NArg())
-	for i := 0; i < len(votes); i++ {
+	uniqueVotes := make(map[SuggestionOrderID]struct{})
+	var emptyMember struct{}
+	var votes []Vote
+	for i := 0; i < c.NArg(); i++ {
 		suggestionOrderIDArg := c.Args().Get(i)
 		suggestionOrderID, parseErr := strconv.ParseUint(suggestionOrderIDArg, 10, 64)
 		if parseErr != nil {
@@ -62,13 +64,21 @@ func castVotesAction(c *cli.Context) error {
 			return writeErr
 		}
 
-		votes[i] = Vote{
+		id := SuggestionOrderID(suggestionOrderID)
+		_, exists := uniqueVotes[id]
+		if exists {
+			continue
+		}
+
+		votes = append(votes, Vote{
 			VoteID:            VoteID(uuid.New().String()),
-			SuggestionOrderID: SuggestionOrderID(suggestionOrderID),
+			SuggestionOrderID: id,
 			Author:            c.String("user"),
 			Preference:        uint(i + 1),
 			WeekID:            settings.weekID,
-		}
+		})
+
+		uniqueVotes[SuggestionOrderID(suggestionOrderID)] = emptyMember
 	}
 
 	dbSession, err := sql.Open("sqlite3", settings.config.dbFilePath)
