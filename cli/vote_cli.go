@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/mattn/go-sqlite3"
 	"github.com/urfave/cli/v2"
 )
 
@@ -92,12 +92,18 @@ func castVotesAction(c *cli.Context) error {
 		}
 
 		log.Printf("[error] %v", sr.err)
-		c.App.Writer.Write([]byte(fmt.Sprintf("Vote for suggestion %d resulted in an error.\n", sr.vote.SuggestionOrderID)))
+
+		if sr.err.(sqlite3.Error).Code == sqlite3.ErrConstraint {
+			c.App.Writer.Write([]byte(fmt.Sprintf("Suggestion %d does not exist.\n", sr.vote.SuggestionOrderID)))
+		} else {
+			c.App.Writer.Write([]byte(fmt.Sprintf("Vote for suggestion %d resulted in an error.\n", sr.vote.SuggestionOrderID)))
+		}
+
 		hasErr = true
 	}
 
 	if hasErr {
-		c.App.Writer.Write([]byte("Unable to save votes. Something went wrong with the transaction.\n"))
+		c.App.Writer.Write([]byte("Unable to cast votes. Something went wrong with the transaction.\n"))
 		return errors.New("END of vote bulk save errors")
 	}
 
