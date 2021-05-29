@@ -78,7 +78,7 @@ func castVotesAction(c *cli.Context) error {
 			WeekID:            settings.weekID,
 		})
 
-		uniqueVotes[SuggestionOrderID(suggestionOrderID)] = emptyMember
+		uniqueVotes[id] = emptyMember
 	}
 
 	dbSession, err := sql.Open("sqlite3", settings.config.dbFilePath)
