@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/fredlawl/200-colony-movie-night-bot/general"
+	"github.com/fredlawl/200-colony-movie-night-bot/suggestion"
 )
 
 type Repository struct {
@@ -92,4 +93,48 @@ func (context *Repository) SuggestionCnt(weekID general.WeekID) int {
 	}
 
 	return cnt
+}
+
+func (context *Repository) VotesByWeek(weekID general.WeekID) []Vote {
+	var votes []Vote = make([]Vote, 0)
+
+	stmt, err := context.session.Prepare(`
+	SELECT
+		v.suggestionID
+		, s.movie
+		, v.preference
+		, v.author
+	FROM votes v
+	INNER JOIN suggestions s ON s.id = v.suggestionID
+	WHERE weekID = ?`)
+
+	if err != nil {
+		return votes
+	}
+
+	rows, err := stmt.Query(weekID)
+	if err != nil {
+		return votes
+	}
+
+	var suggestionID int
+	var movie string
+	var preference uint
+	var author string
+
+	for rows.Next() {
+		err = rows.Scan(&suggestionID, &movie, &preference, &author)
+		if err != nil {
+			return votes
+		}
+
+		votes = append(votes, Vote{
+			SuggestionOrderedID: suggestion.OrderedID(suggestionID),
+			Movie:               general.MovieFromString(movie),
+			Preference:          preference,
+			Author:              author,
+		})
+	}
+
+	return votes
 }

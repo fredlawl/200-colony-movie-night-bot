@@ -16,7 +16,7 @@ import (
 
 func Command() *cli.Command {
 	description := `Vote for a movie in order of preference:
-    mov votes cast [Suggestion ID 1], [Suggestion ID 2], ... [Suggestion ID N]
+    mov votes cast [Suggestion ID 1] [Suggestion ID 2] ... [Suggestion ID N]
 
 	To recast votes, this command must be written again. All previous votes will be nullified and replaced with this new order.
 `
@@ -32,6 +32,12 @@ func Command() *cli.Command {
 				Aliases: []string{"c"},
 				Usage:   "Casts votes for for movies",
 				Action:  castVotesAction,
+			},
+			{
+				Name:    "list",
+				Aliases: []string{"l"},
+				Usage:   "List votes",
+				Action:  listVotesAction,
 			},
 		},
 	}
@@ -111,6 +117,20 @@ func castVotesAction(c *cli.Context) error {
 		c.App.Writer.Write([]byte("Unable to cast votes. Something went wrong with the transaction.\n"))
 		return errors.New("END of vote bulk save errors")
 	}
+
+	return nil
+}
+
+func listVotesAction(c *cli.Context) error {
+	settings := c.App.Metadata["settings"].(*general.AppSettings)
+	// dbSession := c.App.Metadata["dbSession"].(*sql.DB)
+
+	if settings.CurPeriod.Name == general.Sleep && !c.Bool("bypass") {
+		_, writeErr := c.App.Writer.Write([]byte("Sorry, unable to score votes. The vote period has already ended.\n"))
+		return writeErr
+	}
+
+	// voteRepository := NewVoteRepository(dbSession)
 
 	return nil
 }
