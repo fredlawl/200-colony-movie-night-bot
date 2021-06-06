@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fredlawl/200-colony-movie-night-bot/cli/suggestion"
+	"github.com/fredlawl/200-colony-movie-night-bot/cli/vote"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 )
@@ -56,8 +58,8 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
-			SuggestionCliCommand(),
-			VoteCliCommand(),
+			suggestion.Command(),
+			vote.Command(),
 		},
 	}
 
