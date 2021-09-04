@@ -11,8 +11,6 @@ type Repository struct {
 }
 
 func NewRepository(session *sql.DB) *Repository {
-	// This could result in an error, but that's fine
-	session.Exec("PRAGMA foreign_keys = ON")
 	return &Repository{
 		session: session,
 	}

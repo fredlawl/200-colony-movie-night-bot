@@ -51,6 +51,9 @@ func main() {
 	}
 	defer dbSession.Close()
 
+	// SQLITE3 does not have foreign_keys turned on by default
+	dbSession.Exec("PRAGMA foreign_keys = ON")
+
 	// Load CLI
 	app := &cli.App{
 		Metadata: map[string]interface{}{
