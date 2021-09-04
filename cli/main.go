@@ -1,12 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/fredlawl/200-colony-movie-night-bot/cli/general"
 	"github.com/fredlawl/200-colony-movie-night-bot/cli/suggestion"
 	"github.com/fredlawl/200-colony-movie-night-bot/cli/vote"
 	"github.com/google/uuid"
@@ -25,13 +27,36 @@ func main() {
 
 	if errorLogFileErr != nil {
 		log.Fatalf("[error] %s error creating logfile %v", appID, errorLogFileErr)
+		return
 	}
 	defer errorLogFile.Close()
 
 	log.SetOutput(errorLogFile)
 	log.SetPrefix(appID + " - ")
 
+	// Load app settings
+	cfg := general.DefaultConfiguration()
+	settings, settingsErr := general.CreateAppSettings(cfg)
+	if settingsErr != nil {
+		log.Fatalf("[error] %s error establishing settings %v", appID, settingsErr)
+		return
+	}
+
+	settings.AppID = appID
+
+	dbSession, dbSessionErr := sql.Open("sqlite3", settings.Config.DbFilePath)
+	if dbSessionErr != nil {
+		log.Fatalf("[error] %s error establishing settings %v", appID, dbSessionErr)
+		return
+	}
+	defer dbSession.Close()
+
+	// Load CLI
 	app := &cli.App{
+		Metadata: map[string]interface{}{
+			"settings":  settings,
+			"dbSession": dbSession,
+		},
 		Name:     "mov",
 		HelpName: "mov",
 		Usage:    "an application to manage movie night movie suggestions and votes.",

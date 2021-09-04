@@ -38,12 +38,8 @@ func Command() *cli.Command {
 }
 
 func castVotesAction(c *cli.Context) error {
-	cfg := general.DefaultConfiguration()
-	settings, settingsErr := general.CreateAppSettings(cfg)
-
-	if settingsErr != nil {
-		return settingsErr
-	}
+	settings := c.App.Metadata["settings"].(*general.AppSettings)
+	dbSession := c.App.Metadata["dbSession"].(*sql.DB)
 
 	if c.NArg() < 1 {
 		_, writeErr := c.App.Writer.Write([]byte("You must make at least one vote.\n"))
@@ -82,12 +78,6 @@ func castVotesAction(c *cli.Context) error {
 
 		uniqueVotes[id] = emptyMember
 	}
-
-	dbSession, err := sql.Open("sqlite3", settings.Config.DbFilePath)
-	if err != nil {
-		return err
-	}
-	defer dbSession.Close()
 
 	voteRepository := NewRepository(dbSession)
 

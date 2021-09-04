@@ -53,18 +53,8 @@ Remove suggestion:
 }
 
 func suggestMovieAction(c *cli.Context) error {
-	cfg := general.DefaultConfiguration()
-	settings, settingsErr := general.CreateAppSettings(cfg)
-
-	if settingsErr != nil {
-		return settingsErr
-	}
-
-	dbSession, err := sql.Open("sqlite3", settings.Config.DbFilePath)
-	if err != nil {
-		return err
-	}
-	defer dbSession.Close()
+	settings := c.App.Metadata["settings"].(*general.AppSettings)
+	dbSession := c.App.Metadata["dbSession"].(*sql.DB)
 
 	suggestionRepository := NewRepository(dbSession)
 
@@ -94,18 +84,8 @@ func suggestMovieAction(c *cli.Context) error {
 }
 
 func listMoviesAction(c *cli.Context) error {
-	cfg := general.DefaultConfiguration()
-	settings, settingsErr := general.CreateAppSettings(cfg)
-
-	if settingsErr != nil {
-		return settingsErr
-	}
-
-	dbSession, err := sql.Open("sqlite3", settings.Config.DbFilePath)
-	if err != nil {
-		return err
-	}
-	defer dbSession.Close()
+	settings := c.App.Metadata["settings"].(*general.AppSettings)
+	dbSession := c.App.Metadata["dbSession"].(*sql.DB)
 
 	suggestionRepository := NewRepository(dbSession)
 
@@ -126,18 +106,8 @@ func listMoviesAction(c *cli.Context) error {
 }
 
 func removeMovieAction(c *cli.Context) error {
-	cfg := general.DefaultConfiguration()
-	settings, settingsErr := general.CreateAppSettings(cfg)
-
-	if settingsErr != nil {
-		return settingsErr
-	}
-
-	dbSession, err := sql.Open("sqlite3", settings.Config.DbFilePath)
-	if err != nil {
-		return err
-	}
-	defer dbSession.Close()
+	settings := c.App.Metadata["settings"].(*general.AppSettings)
+	dbSession := c.App.Metadata["dbSession"].(*sql.DB)
 
 	suggestionRepository := NewRepository(dbSession)
 

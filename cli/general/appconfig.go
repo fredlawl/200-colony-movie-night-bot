@@ -34,6 +34,7 @@ type AppSettings struct {
 	Localization time.Location
 	WeekID       WeekID
 	CurDay       time.Time // This is the current day with no time.
+	AppID        string
 }
 
 func DefaultConfiguration() AppConfig {
