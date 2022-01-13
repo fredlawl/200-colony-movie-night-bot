@@ -1,31 +1,36 @@
-FROM golang:1.16.3-alpine3.13
+FROM golang:1.16.3-alpine3.13 as devtools
 
+RUN apk update \
+    && apk add g++ make \
+    # Go dev tools
+    && go get -v golang.org/x/tools/gopls & \
+    go get -v github.com/go-delve/delve/cmd/dlv & \
+    go get -v github.com/ramya-rao-a/go-outline & \
+    go get -v golang.org/x/lint/golint & \
+    go get -v golang.org/x/tools/refactor/rename & \
+    go get -v github.com/godoctor/godoctor & \
+    go get -v honnef.co/go/tools/cmd/staticcheck & \
+    wait
+
+FROM devtools
+
+ENV GOPATH=/home/golang/go
 ENV CGO_ENABLED=1
 
-RUN apk update
-RUN apk add bash shadow sqlite
+RUN apk update && apk add \
+    bash \ 
+    shadow \
+    sqlite  \
+    python3 \
+    nodejs \
+    npm \
+    && ln -sf python3 /usr/bin/python \
+    && groupadd -g 1000 docker \
+    && useradd -u 1000 -ms /bin/bash -g docker golang
 
-# Packages needed for setting up VS Code SQL extensions
-RUN apk add g++ make python3 nodejs npm
-RUN ln -sf python3 /usr/bin/python
-
-RUN groupadd -g 1000 docker
-RUN useradd -u 1000 -ms /bin/bash -g docker golang
-
-COPY --chown=golang:docker . /home/golang
 WORKDIR /home/golang
+COPY --chown=golang:docker . /home/golang
 
 USER golang
 
 VOLUME /home/golang
-
-RUN go get -v golang.org/x/tools/gopls
-RUN go get -v github.com/go-delve/delve/cmd/dlv
-RUN go get -v github.com/ramya-rao-a/go-outline
-RUN go get -v golang.org/x/lint/golint
-RUN go get -v golang.org/x/tools/refactor/rename
-RUN go get -v github.com/godoctor/godoctor
-RUN go get -v honnef.co/go/tools/cmd/staticcheck
-
-RUN cd cli && go mod tidy
-RUN cd bot && go mod tidy

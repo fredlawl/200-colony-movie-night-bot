@@ -2,12 +2,6 @@
     "folders": [
         {
             "path": "."
-        },
-        {
-            "path": "cli"
-        },
-        {
-            "path": "bot"
         }
     ],
     "launch": {
