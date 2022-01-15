@@ -28,5 +28,16 @@
             }
         ],
         "compounds": []
+    },
+    "settings": {
+        "sqltools.connections": [
+            {
+                "previewLimit": 50,
+                "name": "CLIDB",
+                "driver": "SQLite",
+                "database": "./sqlite-cli.db",
+                "connectionTimeout": 15
+            }
+        ]
     }
 }

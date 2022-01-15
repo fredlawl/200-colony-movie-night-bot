@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS suggestions (
     dateAdded DATETIME NOT NULL DEFAULT current_timestamp
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_suggestions_uuid ON suggestions(uuid);
-CREATE UNIQUE INDEX IF NOT EXISTS ix_suggestions_movieHash ON suggestions(movieHash);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_suggestions_weekID_movieHash ON suggestions(weekID, movieHash);
 CREATE TABLE IF NOT EXISTS votes (
     suggestionID INTEGER NOT NULL,
     weekID INTEGER NOT NULL,
