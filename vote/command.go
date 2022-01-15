@@ -40,14 +40,23 @@ func Command() *cli.Command {
 func castVotesAction(c *cli.Context) error {
 	settings := c.App.Metadata["settings"].(*general.AppSettings)
 	dbSession := c.App.Metadata["dbSession"].(*sql.DB)
-
-	if c.NArg() < 1 {
-		_, writeErr := c.App.Writer.Write([]byte("You must make at least one vote.\n"))
-		return writeErr
-	}
+	author := c.String("user")
+	week := settings.WeekID
 
 	if settings.CurPeriod.Name != general.Voting && !c.Bool("bypass") {
 		_, writeErr := c.App.Writer.Write([]byte("Sorry, unable to cast votes. The vote period has already ended.\n"))
+		return writeErr
+	}
+
+	voteRepository := NewRepository(dbSession)
+
+	numSuggestions, numSuggestionsErr := voteRepository.SuggestionCnt(week)
+	if numSuggestionsErr != nil {
+		return numSuggestionsErr
+	}
+
+	if numSuggestions == 0 {
+		_, writeErr := c.App.Writer.Write([]byte(fmt.Sprintf("There are no suggestions this week! Add some :D\n")))
 		return writeErr
 	}
 
@@ -71,17 +80,15 @@ func castVotesAction(c *cli.Context) error {
 		votes = append(votes, Vote{
 			VoteID:              ID(uuid.New().String()),
 			SuggestionOrderedID: id,
-			Author:              c.String("user"),
+			Author:              author,
 			Preference:          uint(i + 1),
-			WeekID:              settings.WeekID,
+			WeekID:              week,
 		})
 
 		uniqueVotes[id] = emptyMember
 	}
 
-	voteRepository := NewRepository(dbSession)
-
-	saveResults, err := voteRepository.BulkSaveVotes(votes)
+	saveResults, err := voteRepository.BulkSaveVotes(author, week, votes)
 	if err != nil {
 		c.App.Writer.Write([]byte("Unable to save votes. Something went wrong with the transaction.\n"))
 		return err
