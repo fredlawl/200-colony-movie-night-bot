@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fredlawl/200-colony-movie-night-bot/general"
 	"github.com/fredlawl/200-colony-movie-night-bot/suggestion"
 	"github.com/fredlawl/200-colony-movie-night-bot/vote"
-	"github.com/fredlawl/200-colony-movie-night-bot/general"
 	"github.com/google/uuid"
 	"github.com/urfave/cli/v2"
 )
@@ -26,7 +26,7 @@ func Run(args []string) {
 	errorLogFile, errorLogFileErr := os.OpenFile(errorLogName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 
 	if errorLogFileErr != nil {
-		log.Fatalf("[error] %s error creating logfile %v", appID, errorLogFileErr)
+		log.Fatalf("[error] %s error creating logfile %+v", appID, errorLogFileErr)
 		return
 	}
 	defer errorLogFile.Close()
@@ -38,7 +38,7 @@ func Run(args []string) {
 	cfg := general.DefaultConfiguration()
 	settings, settingsErr := general.CreateAppSettings(cfg)
 	if settingsErr != nil {
-		log.Fatalf("[error] %s error establishing settings %v", appID, settingsErr)
+		log.Fatalf("[error] %s error establishing settings %+v", appID, settingsErr)
 		return
 	}
 
@@ -46,7 +46,7 @@ func Run(args []string) {
 
 	dbSession, dbSessionErr := sql.Open("sqlite3", settings.Config.DbFilePath)
 	if dbSessionErr != nil {
-		log.Fatalf("[error] %s error establishing settings %v", appID, dbSessionErr)
+		log.Fatalf("[error] %s error establishing settings %+v", appID, dbSessionErr)
 		return
 	}
 	defer dbSession.Close()
@@ -95,6 +95,6 @@ func Run(args []string) {
 	if cliErr != nil {
 		log.Printf("[error] %s",
 			strings.Join(os.Args, " "))
-		log.Fatalf("[error] %v", cliErr)
+		log.Fatalf("[error] %+v", cliErr)
 	}
 }

@@ -2,6 +2,9 @@ package vote
 
 import (
 	"database/sql"
+	"log"
+
+	"github.com/pkg/errors"
 
 	"github.com/fredlawl/200-colony-movie-night-bot/general"
 )
@@ -30,19 +33,19 @@ func (context *Repository) BulkSaveVotes(author string, week general.WeekID, vot
 
 	tx, err := context.session.Begin()
 	if err != nil {
-		return emptyBulkResult, err
+		return emptyBulkResult, errors.Wrap(err, "")
 	}
 
-	truncateStmt, truncateStmtErr := context.session.Prepare(`DELETE FROM votes WHERE weekID = ? AND author = ?`)
-	if truncateStmtErr != nil {
+	truncateStmt, err := context.session.Prepare(`DELETE FROM votes WHERE weekID = ? AND author = ?`)
+	if err != nil {
 		tx.Rollback()
-		return emptyBulkResult, truncateStmtErr
+		return emptyBulkResult, errors.Wrap(err, "")
 	}
 
-	_, truncateExecErr := tx.Stmt(truncateStmt).Exec(week.String(), author)
-	if truncateExecErr != nil {
+	_, truncateErr := tx.Stmt(truncateStmt).Exec(week.String(), author)
+	if truncateErr != nil {
 		tx.Rollback()
-		return emptyBulkResult, truncateExecErr
+		return emptyBulkResult, errors.Wrap(truncateErr, "")
 	}
 
 	// TODO: Figure out how to BULK insert w/ prepared statement
@@ -51,7 +54,8 @@ func (context *Repository) BulkSaveVotes(author string, week general.WeekID, vot
 		VALUES (?, ?, ?, ?)
 	`)
 	if err != nil {
-		return emptyBulkResult, tx.Rollback()
+		tx.Rollback()
+		return emptyBulkResult, errors.Wrap(err, "")
 	}
 
 	var hasErrors = false
@@ -60,6 +64,7 @@ func (context *Repository) BulkSaveVotes(author string, week general.WeekID, vot
 		bulkResults[i].vote = v
 		_, bulkResults[i].err = tx.Stmt(stmt).Exec(v.SuggestionOrderedID,
 			v.WeekID.String(), v.Author, v.Preference)
+		bulkResults[i].err = errors.Wrap(bulkResults[i].err, "")
 		if !hasErrors {
 			hasErrors = bulkResults[i].err != nil
 		}
@@ -72,17 +77,19 @@ func (context *Repository) BulkSaveVotes(author string, week general.WeekID, vot
 	return bulkResults, tx.Commit()
 }
 
-func (context *Repository) SuggestionCnt(weekID general.WeekID) (int, error) {
+func (context *Repository) SuggestionCnt(weekID general.WeekID) int {
 	stmt, err := context.session.Prepare("SELECT COUNT(id) FROM suggestions WHERE weekID = ?")
 	if err != nil {
-		return 0, err
+		log.Fatalf("[error] %+v\n", errors.Wrap(err, ""))
+		return 0
 	}
 
 	var cnt int
 	queryErr := stmt.QueryRow(weekID.String()).Scan(&cnt)
 	if queryErr != nil {
-		return 0, queryErr
+		log.Fatalf("[error] %+v", errors.Wrap(err, ""))
+		return 0
 	}
 
-	return cnt, nil
+	return cnt
 }

@@ -50,11 +50,7 @@ func castVotesAction(c *cli.Context) error {
 
 	voteRepository := NewRepository(dbSession)
 
-	numSuggestions, numSuggestionsErr := voteRepository.SuggestionCnt(week)
-	if numSuggestionsErr != nil {
-		return numSuggestionsErr
-	}
-
+	numSuggestions := voteRepository.SuggestionCnt(week)
 	if numSuggestions == 0 {
 		_, writeErr := c.App.Writer.Write([]byte(fmt.Sprintf("There are no suggestions this week! Add some :D\n")))
 		return writeErr

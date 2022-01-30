@@ -126,7 +126,7 @@ func removeMovieAction(c *cli.Context) error {
 	foundSuggestion := suggestionRepository.GetSuggestionByOrder(OrderedID(orderID))
 	if foundSuggestion == nil {
 		_, _ = c.App.Writer.Write([]byte("Unable to find a matching suggestion.\n"))
-		return err
+		return nil
 	}
 
 	// Compare suggestion authors to validate this user can remove suggestion
