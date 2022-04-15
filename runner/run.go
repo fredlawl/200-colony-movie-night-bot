@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fredlawl/200-colony-movie-night-bot/general"
+	"github.com/fredlawl/200-colony-movie-night-bot/info"
 	"github.com/fredlawl/200-colony-movie-night-bot/suggestion"
 	"github.com/fredlawl/200-colony-movie-night-bot/vote"
 	"github.com/google/uuid"
@@ -88,6 +89,7 @@ func Run(args []string) {
 		Commands: []*cli.Command{
 			suggestion.Command(),
 			vote.Command(),
+			info.Command(),
 		},
 	}
 
